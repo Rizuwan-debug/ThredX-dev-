@@ -134,7 +134,7 @@ export default function SignupPage() {
             <path d="M16 21L18 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             <path d="M8 21L6 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
           </svg>
-          <CardTitle className="text-3xl font-bold text-primary">ThredX Lite</CardTitle>
+          <CardTitle className="text-3xl font-bold text-primary">TredX</CardTitle> {/* Updated from ThredX Lite */}
           <CardDescription>Create your secure account. Your Privacy, Our Priority.</CardDescription>
         </CardHeader>
         <CardContent>

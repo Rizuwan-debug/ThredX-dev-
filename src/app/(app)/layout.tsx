@@ -14,7 +14,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <path d="M21 8L16 3H8L3 8V16L8 21H16L21 16V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" stroke="currentColor" strokeWidth="2"/>
               </svg>
-             <span className="ml-2 font-bold">ThredX Lite</span>
+             <span className="ml-2 font-bold">TredX</span> {/* Updated from ThredX Lite */}
            </div>
           {/* Add other nav items like profile, settings icons later */}
         </div>
@@ -24,7 +24,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </main>
       {/* Placeholder for Footer */}
       {/* <footer className="py-4 text-center text-sm text-muted-foreground">
-        © {new Date().getFullYear()} ThredX Lite
+        © {new Date().getFullYear()} TredX
       </footer> */}
     </div>
   );

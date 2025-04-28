@@ -12,7 +12,7 @@ const conversations = [
 
 const messages = [
     { id: 1, sender: 'mutual_friend_1', text: 'Hey! How are you?', timestamp: '10:30 AM', isOwn: false },
-    { id: 2, sender: 'You', text: 'Doing well, thanks! Just testing ThredX.', timestamp: '10:31 AM', isOwn: true },
+    { id: 2, sender: 'You', text: 'Doing well, thanks! Just testing TredX.', timestamp: '10:31 AM', isOwn: true }, // Updated ThredX
     { id: 3, sender: 'mutual_friend_1', text: 'Cool! Feels secure.', timestamp: '10:32 AM', isOwn: false },
 ];
 
