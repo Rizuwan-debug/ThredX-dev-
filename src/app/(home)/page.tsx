@@ -7,8 +7,8 @@ import Link from 'next/link';
 // Placeholder for Home Feed functionality
 // In a real app, this would fetch posts from mutual followers
 const posts = [
-  { id: 1, username: 'mutual_friend_1', content: 'Just setting up my TredX!', timestamp: '2 mins ago', image: 'https://picsum.photos/seed/post1/600/400' }, // Updated ThredX
-  { id: 2, username: 'another_friend', content: 'Privacy matters. #TredX', timestamp: '1 hour ago' }, // Updated ThredX
+  { id: 1, username: 'mutual_friend_1', content: 'Just setting up my ThredX!', timestamp: '2 mins ago', image: 'https://picsum.photos/seed/post1/600/400' }, // Updated ThredX
+  { id: 2, username: 'another_friend', content: 'Privacy matters. #ThredX', timestamp: '1 hour ago' }, // Updated ThredX
   { id: 3, username: 'secure_user', content: 'Exploring the encrypted world.', timestamp: '3 hours ago', image: 'https://picsum.photos/seed/post3/600/400' },
 ];
 

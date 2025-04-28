@@ -12,7 +12,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "TredX", // Updated from ThredX Lite
+  title: "ThredX", // Updated back from TredX
   description: "Your Privacy, Our Priority.",
 };
 
