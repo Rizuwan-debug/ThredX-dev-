@@ -26,25 +26,36 @@ import { Textarea } from "@/components/ui/textarea"; // Use Textarea for Seed Ph
 
 // Placeholder for authentication function - replace with actual implementation
 const authenticateUser = async (username: string, seedPhraseWords: string) => {
-  console.log("Authenticating user:", username);
+  console.log("Attempting to authenticate user:", username);
   // WARNING: In a real application:
   // 1. DO NOT log the username or seed phrase.
   // 2. This function should take the seed phrase (or ideally, a password derived from it),
   //    derive the necessary cryptographic keys (e.g., using PBKDF2/Argon2),
-  //    fetch the stored *hash* for the user, and compare the derived key hash with the stored hash.
-  // 3. NEVER compare the raw seed phrase directly.
+  //    fetch the stored *hash* for the user from a secure backend, and compare the derived key hash with the stored hash.
+  // 3. NEVER compare the raw seed phrase directly. Never store the raw seed phrase on the server.
   // 4. Implement secure session management (e.g., JWT, secure cookies).
   // This simulates checking credentials.
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
 
-  // **DEMO ONLY:** Check if username is 'testuser' and the input looks like 5 words.
-  // **THIS IS NOT SECURE AUTHENTICATION**
+  // **DEMO ONLY:** Check if username is not empty and the input looks like 5 words.
+  // **THIS IS NOT SECURE AUTHENTICATION AND DOES NOT VALIDATE AGAINST SIGNUP DATA**
+  // It allows login for *any* non-empty username if the seed phrase format is correct.
   const words = seedPhraseWords.trim().split(/\s+/); // Split by whitespace
-  if (username === "testuser" && words.length === 5 && words.every(word => word.length > 0)) {
-      // In a real app, you'd return a session token/user data here.
-      return { success: true, message: "Login successful!" };
+  const isValidFormat = words.length === 5 && words.every(word => word.length > 0);
+
+  if (username.trim().length > 0 && isValidFormat) {
+      console.log("Demo authentication successful for:", username);
+      // In a real app, you'd return a session token/user data here after backend verification.
+      return { success: true, message: "Login successful! (Demo Mode)" };
   } else {
-      return { success: false, message: "Invalid username or seed phrase format (expecting 5 words)." };
+      console.log("Demo authentication failed for:", username);
+      let message = "Invalid username or seed phrase format.";
+      if (username.trim().length === 0) {
+          message = "Username cannot be empty.";
+      } else if (!isValidFormat) {
+          message = "Seed phrase must be exactly 5 non-empty words separated by spaces.";
+      }
+      return { success: false, message: message };
   }
 };
 
@@ -85,7 +96,7 @@ export default function LoginPage() {
           title: "Login Successful",
           description: result.message,
         });
-        // TODO: Implement REAL session management (e.g., set cookie/token)
+        // TODO: Implement REAL session management (e.g., set cookie/token via backend API call)
         // Redirect to a protected route (e.g., home feed)
         router.push("/home"); // Redirect to home page on successful login
       } else {
