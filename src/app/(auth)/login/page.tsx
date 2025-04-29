@@ -25,49 +25,40 @@ import Link from 'next/link';
 import { Textarea } from "@/components/ui/textarea"; // Use Textarea for Seed Phrase
 
 // Placeholder for authentication function - replace with actual implementation
-const authenticateUser = async (username: string, seedPhraseHex: string) => {
+const authenticateUser = async (username: string, seedPhraseWords: string) => {
   console.log("Authenticating user:", username);
   // WARNING: In a real application:
-  // 1. DO NOT log the username or seed phrase/hex.
+  // 1. DO NOT log the username or seed phrase.
   // 2. This function should take the seed phrase (or ideally, a password derived from it),
   //    derive the necessary cryptographic keys (e.g., using PBKDF2/Argon2),
   //    fetch the stored *hash* for the user, and compare the derived key hash with the stored hash.
-  // 3. NEVER compare the raw seed phrase/hex directly.
+  // 3. NEVER compare the raw seed phrase directly.
   // 4. Implement secure session management (e.g., JWT, secure cookies).
   // This simulates checking credentials.
   await new Promise(resolve => setTimeout(resolve, 1000));
 
-  // **DEMO ONLY:** Check against the specific hex generated in signup placeholder
-  const placeholderHex = "example seed phrase will be generated here"; // Keep this consistent if testing placeholder
-  const actualGeneratedHexFormat = /^[0-9a-f]{32}$/; // Example: 16 bytes = 32 hex chars
-
-  // Simulate successful login ONLY if username is 'testuser' AND the input looks like a valid hex seed phrase
-  // OR if it matches the old placeholder text during transition.
+  // **DEMO ONLY:** Check if username is 'testuser' and the input looks like 5 words.
   // **THIS IS NOT SECURE AUTHENTICATION**
-  if (
-    username === "testuser" &&
-    (seedPhraseHex === placeholderHex || actualGeneratedHexFormat.test(seedPhraseHex))
-  ) {
+  const words = seedPhraseWords.trim().split(/\s+/); // Split by whitespace
+  if (username === "testuser" && words.length === 5 && words.every(word => word.length > 0)) {
       // In a real app, you'd return a session token/user data here.
       return { success: true, message: "Login successful!" };
   } else {
-      return { success: false, message: "Invalid username or seed phrase format." };
+      return { success: false, message: "Invalid username or seed phrase format (expecting 5 words)." };
   }
 };
 
-// Adjust validation to expect a hex string (e.g., 32 chars for 16 bytes)
-// Or keep it simple if just testing the placeholder
+// Validate as 5 space-separated words
 const formSchema = z.object({
   username: z.string().min(1, "Username is required."),
-  // Validate as a hex string of expected length (e.g., 32 for 128 bits)
   seedPhrase: z.string()
-      .min(10, "Seed phrase is required.")
-      // Example: Add regex for hex if needed, adjust length as per generation
-      // .regex(/^[0-9a-fA-F]{32}$/, "Invalid seed phrase format (should be 32 hex characters).")
-      .refine(value => value.length > 10, { // Basic check, refine as needed
-          message: "Seed phrase seems too short.",
-      }),
+    .min(1, "Seed phrase is required.")
+    .refine(value => {
+        const words = value.trim().split(/\s+/);
+        return words.length === 5 && words.every(word => word.length > 0);
+    }, "Seed phrase must be exactly 5 non-empty words separated by spaces."),
 });
+
 
 type LoginFormValues = z.infer<typeof formSchema>;
 
@@ -87,7 +78,7 @@ export default function LoginPage() {
   const onSubmit = async (values: LoginFormValues) => {
     setIsLoading(true);
     try {
-      // Pass the hex seed phrase to the authentication function
+      // Pass the 5-word seed phrase to the authentication function
       const result = await authenticateUser(values.username, values.seedPhrase);
       if (result.success) {
         toast({
@@ -141,7 +132,7 @@ export default function LoginPage() {
              <path d="M8 21L6 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
           </svg>
           <CardTitle className="text-3xl font-bold text-primary">Welcome Back</CardTitle>
-          <CardDescription>Login securely using your username and seed phrase (hex).</CardDescription>
+          <CardDescription>Login securely using your username and 5-word seed phrase.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -165,19 +156,18 @@ export default function LoginPage() {
                 name="seedPhrase"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Seed Phrase (Hex)</FormLabel>
+                    <FormLabel>5-Word Seed Phrase</FormLabel>
                     <FormControl>
-                      {/* Using Textarea for the hex seed phrase */}
+                      {/* Using Textarea is still okay for pasting multiple words */}
                       <Textarea
-                        placeholder="Enter your secret hexadecimal seed phrase"
+                        placeholder="Enter your 5 secret words separated by spaces"
                         {...field}
-                        className="bg-secondary/30 border-primary/30 focus:ring-primary/50 min-h-[100px] font-mono" // Keep font-mono for hex
+                        className="bg-secondary/30 border-primary/30 focus:ring-primary/50 min-h-[100px] tracking-wider" // Removed font-mono
                         rows={3}
                       />
                     </FormControl>
                      <FormMessage />
-                     {/* Optional: Add a note for clarity */}
-                     {/* <p className="text-xs text-muted-foreground mt-1">Enter the hexadecimal string you saved during signup.</p> */}
+                     <p className="text-xs text-muted-foreground mt-1">Enter the 5 words you saved during signup, separated by spaces.</p>
                   </FormItem>
                 )}
               />

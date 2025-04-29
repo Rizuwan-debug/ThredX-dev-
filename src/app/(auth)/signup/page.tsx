@@ -20,54 +20,43 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertTriangle } from "lucide-react"; // Added AlertTriangle
+import { Loader2, AlertTriangle, Copy } from "lucide-react"; // Added AlertTriangle, Copy
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Added Alert components
 
-// Placeholder for crypto functions - replace with actual implementation
-// WARNING: This generates a secure random HEX STRING, not a standard BIP39 word-based seed phrase.
-// For a production application, use a dedicated library like 'bip39' to generate
-// mnemonic phrases according to the standard.
+// Simple word list for demo purposes. A production app should use a standard wordlist (e.g., BIP39).
+const wordList = [
+  "apple", "banana", "cherry", "date", "elderberry", "fig", "grape", "honeydew",
+  "kiwi", "lemon", "mango", "nectarine", "orange", "papaya", "quince", "raspberry",
+  "strawberry", "tangerine", "ugli", "vanilla", "watermelon", "xigua", "yuzu", "zucchini",
+  "blue", "green", "red", "yellow", "purple", "orange", "pink", "black", "white", "grey",
+  "cat", "dog", "bird", "fish", "horse", "lion", "tiger", "bear", "wolf", "fox",
+  "sun", "moon", "star", "cloud", "rain", "snow", "wind", "fire", "water", "earth",
+  "happy", "sad", "angry", "calm", "brave", "shy", "kind", "fast", "slow", "loud",
+  "table", "chair", "book", "pen", "lamp", "door", "window", "floor", "wall", "roof",
+  "secure", "privacy", "secret", "shield", "guard", "lock", "key", "code", "trust", "vault"
+];
+
+
+// Function to generate 5 unique random words
 const generateSeedPhrase = async (): Promise<string> => {
-  try {
-    // Generate 16 bytes (128 bits) of random entropy
-    const entropy = new Uint8Array(16);
-    if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
-       window.crypto.getRandomValues(entropy);
-    } else {
-        // Fallback for environments without window.crypto (e.g., SSR, though this is 'use client')
-        // This fallback is NOT cryptographically secure for production.
-        console.warn("window.crypto.getRandomValues not available. Using insecure fallback for seed generation.");
-        for (let i = 0; i < entropy.length; i++) {
-            entropy[i] = Math.floor(Math.random() * 256);
-        }
-    }
-
-
-    // Convert bytes to a hex string
-    const hexPhrase = Array.from(entropy)
-      .map((byte) => byte.toString(16).padStart(2, '0'))
-      .join('');
-
-    // In a real BIP39 implementation, these bytes would be used
-    // with a wordlist and checksum calculation.
-    // Returning hex for now as a placeholder for secure random data.
-    return hexPhrase;
-  } catch (error) {
-    console.error("Error generating secure random data:", error);
-    // Fallback or throw error - essential for security
-    throw new Error("Could not generate secure seed data. Crypto API might not be available or failed.");
+  const selectedWords = new Set<string>();
+  while (selectedWords.size < 5) {
+    const randomIndex = Math.floor(Math.random() * wordList.length);
+    selectedWords.add(wordList[randomIndex]);
   }
+  return Array.from(selectedWords).join(' '); // Return words separated by space
 };
 
+
 // Placeholder for user creation - replace with actual implementation
-const createUser = async (username: string, seedPhrase: string /* This is currently hex */) => {
+const createUser = async (username: string, seedPhrase: string /* This is now 5 words */) => {
   console.log("Creating user:", username);
   // WARNING: In a real application:
-  // 1. DO NOT log the seed phrase/hex.
-  // 2. Use the *original entropy* (derived from the seed phrase if using BIP39)
-  //    to generate cryptographic keys (e.g., using PBKDF2 or Argon2 with the seed as input).
-  // 3. Store a HASH of a derived key or password, NEVER the seed phrase/hex itself.
+  // 1. DO NOT log the seed phrase.
+  // 2. Use the seed phrase (possibly with a user password as salt/pepper)
+  //    to generate cryptographic keys (e.g., using PBKDF2 or Argon2).
+  // 3. Store a HASH of a derived key or password, NEVER the seed phrase itself.
   // 4. The seed phrase is for the *user* to keep, not for the server to store plaintext.
   // This function simulates an API call.
   await new Promise(resolve => setTimeout(resolve, 1000));
@@ -105,22 +94,35 @@ export default function SignupPage() {
     try {
       const seed = await generateSeedPhrase();
       setGeneratedSeedPhrase(seed);
-      form.setValue("seedPhrase", seed); // Store generated hex in form state (though not directly used for validation here)
+      form.setValue("seedPhrase", seed); // Store generated phrase in form state
       toast({
-        title: "Seed Phrase (Hex) Generated",
-        description: "Please copy and save this hexadecimal string securely. You WILL need it to log in. Treat it like a password.",
-        variant: "default", // Use default or a custom variant if needed
-        duration: 9000, // Give more time to read/copy
+        title: "5-Word Seed Phrase Generated",
+        description: "Please copy and save these 5 words securely. You WILL need them to log in. Treat them like a password.",
+        variant: "default",
+        duration: 10000, // Give more time to read/copy
       });
     } catch (error) {
       console.error("Seed generation failed:", error);
       toast({
         variant: "destructive",
         title: "Error Generating Seed",
-        description: (error as Error).message || "Failed to generate secure seed data. Please try again.",
+        description: (error as Error).message || "Failed to generate seed phrase. Please try again.",
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCopySeed = () => {
+    if (generatedSeedPhrase) {
+      navigator.clipboard.writeText(generatedSeedPhrase)
+        .then(() => {
+          toast({ title: 'Copied!', description: 'Seed phrase copied to clipboard.' });
+        })
+        .catch(err => {
+          console.error('Failed to copy seed phrase: ', err);
+          toast({ variant: 'destructive', title: 'Copy Failed', description: 'Could not copy seed phrase to clipboard.' });
+        });
     }
   };
 
@@ -129,7 +131,7 @@ export default function SignupPage() {
         toast({
             variant: "destructive",
             title: "Seed Phrase Required",
-            description: "Please generate and save your hexadecimal seed phrase before signing up.",
+            description: "Please generate and save your 5-word seed phrase before signing up.",
         });
         return;
     }
@@ -216,28 +218,38 @@ export default function SignupPage() {
                     className="w-full border-primary/50 hover:bg-primary/10"
                   >
                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                   {generatedSeedPhrase ? "Seed Generated (Hex)" : "Generate Secure Seed"}
+                   {generatedSeedPhrase ? "Seed Phrase Generated" : "Generate 5-Word Seed"}
                  </Button>
 
                  {/* Display the generated seed phrase */}
                  {generatedSeedPhrase && (
                     <div className="mt-2 space-y-2">
-                       <div className="p-3 bg-muted rounded-md border border-primary/30">
-                          <p className="text-sm font-mono break-words text-foreground/80">{generatedSeedPhrase}</p>
+                       <div className="relative p-3 bg-muted rounded-md border border-primary/30 group">
+                          <p className="text-lg font-semibold tracking-wider text-center text-foreground/90">{generatedSeedPhrase}</p>
+                          <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="absolute top-1 right-1 h-7 w-7 opacity-50 group-hover:opacity-100 transition-opacity"
+                              onClick={handleCopySeed}
+                              aria-label="Copy seed phrase"
+                            >
+                             <Copy className="h-4 w-4" />
+                          </Button>
                        </div>
                         <Alert variant="destructive">
                            <AlertTriangle className="h-4 w-4" />
                            <AlertTitle>Critical Security Warning</AlertTitle>
                            <AlertDescription>
-                             <strong>Save this hexadecimal seed phrase securely NOW.</strong> Store it offline, like on paper or a hardware wallet.
+                             <strong>Save this 5-word seed phrase securely NOW.</strong> Write it down, store it offline.
                              Anyone with this phrase can access your account. <strong>There is NO recovery if you lose it.</strong> Treat it like your most valuable password.
                            </AlertDescription>
                        </Alert>
-                         <Alert variant="default" className="border-yellow-500/50 text-yellow-700 dark:text-yellow-300 dark:border-yellow-400/40">
-                            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                       <Alert variant="warning">
+                            <AlertTriangle className="h-4 w-4" />
                             <AlertTitle>Developer Note</AlertTitle>
                             <AlertDescription>
-                                This is a secure hex string for demo purposes. A production app should use a standard word-based BIP39 mnemonic phrase generated from secure entropy for better usability and compatibility.
+                                This uses a simple random word list for demo purposes. A production app should use a standard, cryptographically secure method like BIP39 for generating mnemonic phrases.
                             </AlertDescription>
                         </Alert>
                     </div>
