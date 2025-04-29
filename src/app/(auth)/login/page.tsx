@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -24,23 +25,48 @@ import Link from 'next/link';
 import { Textarea } from "@/components/ui/textarea"; // Use Textarea for Seed Phrase
 
 // Placeholder for authentication function - replace with actual implementation
-const authenticateUser = async (username: string, seedPhrase: string) => {
-  console.log("Authenticating user:", username, seedPhrase);
-  // Simulate API call & validation
+const authenticateUser = async (username: string, seedPhraseHex: string) => {
+  console.log("Authenticating user:", username);
+  // WARNING: In a real application:
+  // 1. DO NOT log the username or seed phrase/hex.
+  // 2. This function should take the seed phrase (or ideally, a password derived from it),
+  //    derive the necessary cryptographic keys (e.g., using PBKDF2/Argon2),
+  //    fetch the stored *hash* for the user, and compare the derived key hash with the stored hash.
+  // 3. NEVER compare the raw seed phrase/hex directly.
+  // 4. Implement secure session management (e.g., JWT, secure cookies).
+  // This simulates checking credentials.
   await new Promise(resolve => setTimeout(resolve, 1000));
-  // In a real app, this would involve verifying the username and
-  // hashed/salted seed phrase against stored credentials.
-  // Return success status and potentially a session token/user data.
-  if (username === "testuser" && seedPhrase === "example seed phrase will be generated here") {
+
+  // **DEMO ONLY:** Check against the specific hex generated in signup placeholder
+  const placeholderHex = "example seed phrase will be generated here"; // Keep this consistent if testing placeholder
+  const actualGeneratedHexFormat = /^[0-9a-f]{32}$/; // Example: 16 bytes = 32 hex chars
+
+  // Simulate successful login ONLY if username is 'testuser' AND the input looks like a valid hex seed phrase
+  // OR if it matches the old placeholder text during transition.
+  // **THIS IS NOT SECURE AUTHENTICATION**
+  if (
+    username === "testuser" &&
+    (seedPhraseHex === placeholderHex || actualGeneratedHexFormat.test(seedPhraseHex))
+  ) {
+      // In a real app, you'd return a session token/user data here.
       return { success: true, message: "Login successful!" };
   } else {
-      return { success: false, message: "Invalid username or seed phrase." };
+      return { success: false, message: "Invalid username or seed phrase format." };
   }
 };
 
+// Adjust validation to expect a hex string (e.g., 32 chars for 16 bytes)
+// Or keep it simple if just testing the placeholder
 const formSchema = z.object({
   username: z.string().min(1, "Username is required."),
-  seedPhrase: z.string().min(10, "Seed phrase is required and seems too short."), // Basic validation
+  // Validate as a hex string of expected length (e.g., 32 for 128 bits)
+  seedPhrase: z.string()
+      .min(10, "Seed phrase is required.")
+      // Example: Add regex for hex if needed, adjust length as per generation
+      // .regex(/^[0-9a-fA-F]{32}$/, "Invalid seed phrase format (should be 32 hex characters).")
+      .refine(value => value.length > 10, { // Basic check, refine as needed
+          message: "Seed phrase seems too short.",
+      }),
 });
 
 type LoginFormValues = z.infer<typeof formSchema>;
@@ -61,16 +87,16 @@ export default function LoginPage() {
   const onSubmit = async (values: LoginFormValues) => {
     setIsLoading(true);
     try {
+      // Pass the hex seed phrase to the authentication function
       const result = await authenticateUser(values.username, values.seedPhrase);
       if (result.success) {
         toast({
           title: "Login Successful",
           description: result.message,
         });
-        // TODO: Implement session management (e.g., set cookie/token)
+        // TODO: Implement REAL session management (e.g., set cookie/token)
         // Redirect to a protected route (e.g., home feed)
-        // For now, just show a success message. Replace with actual redirection.
-        // router.push("/home"); // Example protected route
+        router.push("/home"); // Redirect to home page on successful login
       } else {
          toast({
            variant: "destructive",
@@ -115,7 +141,7 @@ export default function LoginPage() {
              <path d="M8 21L6 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
           </svg>
           <CardTitle className="text-3xl font-bold text-primary">Welcome Back</CardTitle>
-          <CardDescription>Login securely using your username and seed phrase.</CardDescription>
+          <CardDescription>Login securely using your username and seed phrase (hex).</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -139,17 +165,19 @@ export default function LoginPage() {
                 name="seedPhrase"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Seed Phrase</FormLabel>
+                    <FormLabel>Seed Phrase (Hex)</FormLabel>
                     <FormControl>
-                      {/* Using Textarea for potentially long seed phrase */}
+                      {/* Using Textarea for the hex seed phrase */}
                       <Textarea
-                        placeholder="Enter your secret seed phrase"
+                        placeholder="Enter your secret hexadecimal seed phrase"
                         {...field}
-                        className="bg-secondary/30 border-primary/30 focus:ring-primary/50 min-h-[100px] font-mono"
+                        className="bg-secondary/30 border-primary/30 focus:ring-primary/50 min-h-[100px] font-mono" // Keep font-mono for hex
                         rows={3}
                       />
                     </FormControl>
-                    <FormMessage />
+                     <FormMessage />
+                     {/* Optional: Add a note for clarity */}
+                     {/* <p className="text-xs text-muted-foreground mt-1">Enter the hexadecimal string you saved during signup.</p> */}
                   </FormItem>
                 )}
               />
