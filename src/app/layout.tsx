@@ -29,11 +29,12 @@ export default function RootLayout({
           inter.variable
         )}
       >
-        {children}
-        <Toaster />
+        {/* Suspense is crucial for NavigationEvents as it's a Client Component */}
         <Suspense fallback={null}>
           <NavigationEvents />
         </Suspense>
+        {children}
+        <Toaster />
       </body>
     </html>
   );

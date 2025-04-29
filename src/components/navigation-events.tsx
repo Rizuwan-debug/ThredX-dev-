@@ -3,33 +3,46 @@
 import { useEffect } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import NProgress from 'nprogress'
+import 'nprogress/nprogress.css'; // Import nprogress styles
 
 export function NavigationEvents() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    NProgress.configure({ showSpinner: false }); // Optional: hide the spinner
+    // Configure NProgress
+    NProgress.configure({ showSpinner: false });
 
     const handleStart = () => NProgress.start();
     const handleComplete = () => NProgress.done();
 
-    // For initial load and subsequent navigations
-    handleComplete(); // Ensure it's done on initial load
+    // Ensure progress is finished on initial load or component mount
+    handleComplete();
+
     return () => {
-        handleComplete(); // Ensure it's done on component unmount
+        // Ensure progress is finished on component unmount
+        handleComplete();
     };
 
   }, []); // Run only once on mount
 
 
   useEffect(() => {
-      // Start progress on pathname or searchParams change
+      // Triggered on route changes
+      console.log("Route changed, starting NProgress:", pathname, searchParams.toString());
       NProgress.start();
-      // Complete progress slightly after change detected
-      // This ensures the bar shows during rendering of the new page
-      const timer = setTimeout(() => NProgress.done(), 100);
-      return () => clearTimeout(timer); // Cleanup timer on new change or unmount
+
+      // Use a minimal timer to ensure NProgress.done() runs after the new page starts rendering.
+      // This prevents the bar from finishing too quickly before the UI updates.
+      const timer = setTimeout(() => {
+        console.log("Completing NProgress");
+        NProgress.done();
+      }, 150); // Adjust timeout as needed, 150ms is a reasonable starting point
+
+      return () => {
+        clearTimeout(timer); // Cleanup timer on new change or unmount
+        NProgress.done(); // Also ensure done on cleanup if change happens fast
+      };
   }, [pathname, searchParams]);
 
 
