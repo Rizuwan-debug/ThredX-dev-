@@ -48,22 +48,25 @@ const authenticateUser = async (username: string, seedPhraseWords: string) => {
   const storedUsername = localStorage.getItem('thredx_username');
   const storedSeedPhrase = localStorage.getItem('thredx_seedPhrase'); // Storing raw seed phrase is BAD PRACTICE - demo only!
 
-  if (username.trim().length > 0 && isValidFormat) {
+  // **VERY INSECURE DEMO LOGIN LOGIC:**
+  // Simply checks if the provided username matches the one stored during signup
+  // AND if the provided seed phrase matches the one stored during signup.
+  if (username === storedUsername && seedPhraseWords === storedSeedPhrase && isValidFormat) {
       console.log("Demo authentication successful for:", username);
-      // Normally, you'd compare derived keys/hashes here.
-      // For demo, just checking format is enough.
-      // Storing username for demo persistence across pages
-      localStorage.setItem('thredx_currentUser', username);
-      // In a real app, you'd return a session token/user data here after backend verification.
+      localStorage.setItem('thredx_currentUser', username); // Store username for demo persistence
       return { success: true, message: "Login successful! (Demo Mode)" };
   } else {
       console.log("Demo authentication failed for:", username);
-      let message = "Invalid username or seed phrase format.";
-      if (username.trim().length === 0) {
-          message = "Username cannot be empty.";
-      } else if (!isValidFormat) {
-          message = "Seed phrase must be exactly 5 non-empty words separated by spaces.";
-      }
+      let message = "Invalid username or seed phrase.";
+       if (!storedUsername || !storedSeedPhrase) {
+           message = "No signup data found (Demo). Please sign up first.";
+       } else if (username !== storedUsername) {
+           message = "Username does not match signup data (Demo)."
+       } else if (seedPhraseWords !== storedSeedPhrase) {
+           message = "Seed phrase does not match signup data (Demo)."
+       } else if (!isValidFormat) {
+        message = "Seed phrase must be exactly 5 non-empty words separated by spaces.";
+       }
       return { success: false, message: message };
   }
 };
@@ -136,7 +139,8 @@ export default function LoginPage() {
     >
       <Card className="w-full max-w-md shadow-2xl border-primary/20">
         <CardHeader className="text-center p-4 sm:p-6">
-          <svg width="40" height="40" sm:width="48" sm:height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto mb-2 text-primary">
+          {/* Removed sm:width and sm:height attributes */}
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto mb-2 text-primary">
              {/* Reusing the same icon as Signup */}
              <path d="M21 8L16 3H8L3 8V16L8 21H16L21 16V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
              <path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" stroke="currentColor" strokeWidth="2"/>

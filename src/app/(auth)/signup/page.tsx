@@ -200,20 +200,21 @@ export default function SignupPage() {
     >
       <Card className="w-full max-w-md shadow-2xl border-primary/20">
         <CardHeader className="text-center p-4 sm:p-6">
-          <svg width="40" height="40" sm:width="48" sm:height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto mb-2 text-primary">
-            <path d="M21 8L16 3H8L3 8V16L8 21H16L21 16V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" stroke="currentColor" strokeWidth="2"/>
-            <path d="M12 3V6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M12 18V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M21 8H18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M6 8H3" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M18 16H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M3 16H6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M16 3L18 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M8 3L6 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M16 21L18 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M8 21L6 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
+           {/* Removed sm:width and sm:height attributes */}
+           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto mb-2 text-primary">
+             <path d="M21 8L16 3H8L3 8V16L8 21H16L21 16V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+             <path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" stroke="currentColor" strokeWidth="2"/>
+             <path d="M12 3V6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+             <path d="M12 18V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+             <path d="M21 8H18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+             <path d="M6 8H3" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+             <path d="M18 16H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+             <path d="M3 16H6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+             <path d="M16 3L18 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+             <path d="M8 3L6 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+             <path d="M16 21L18 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+             <path d="M8 21L6 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+           </svg>
           <CardTitle className="text-2xl sm:text-3xl font-bold text-primary">ThredX</CardTitle>
           <CardDescription className="text-sm sm:text-base">Create your secure account. Your Privacy, Our Priority.</CardDescription>
         </CardHeader>
