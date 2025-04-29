@@ -1,4 +1,5 @@
 import type {NextConfig} from 'next';
+const webpack = require('webpack'); // Import webpack
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -33,7 +34,7 @@ const nextConfig: NextConfig = {
        // Provide Buffer globally
       config.plugins = config.plugins || [];
       config.plugins.push(
-        new (require('webpack').ProvidePlugin)({
+        new webpack.ProvidePlugin({
           Buffer: ['buffer', 'Buffer'],
         })
       );

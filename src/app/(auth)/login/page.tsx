@@ -43,8 +43,17 @@ const authenticateUser = async (username: string, seedPhraseWords: string) => {
   const words = seedPhraseWords.trim().split(/\s+/); // Split by whitespace
   const isValidFormat = words.length === 5 && words.every(word => word.length > 0);
 
+  // Simulate retrieval of stored data (SHOULD BE HASHED in reality)
+  // In this demo, we assume the signup data is implicitly 'known' if format is correct.
+  const storedUsername = localStorage.getItem('thredx_username');
+  const storedSeedPhrase = localStorage.getItem('thredx_seedPhrase'); // Storing raw seed phrase is BAD PRACTICE - demo only!
+
   if (username.trim().length > 0 && isValidFormat) {
       console.log("Demo authentication successful for:", username);
+      // Normally, you'd compare derived keys/hashes here.
+      // For demo, just checking format is enough.
+      // Storing username for demo persistence across pages
+      localStorage.setItem('thredx_currentUser', username);
       // In a real app, you'd return a session token/user data here after backend verification.
       return { success: true, message: "Login successful! (Demo Mode)" };
   } else {
@@ -126,8 +135,8 @@ export default function LoginPage() {
       className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-background to-secondary/20"
     >
       <Card className="w-full max-w-md shadow-2xl border-primary/20">
-        <CardHeader className="text-center">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto mb-2 text-primary">
+        <CardHeader className="text-center p-4 sm:p-6">
+          <svg width="40" height="40" sm:width="48" sm:height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto mb-2 text-primary">
              {/* Reusing the same icon as Signup */}
              <path d="M21 8L16 3H8L3 8V16L8 21H16L21 16V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
              <path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" stroke="currentColor" strokeWidth="2"/>
@@ -142,12 +151,12 @@ export default function LoginPage() {
              <path d="M16 21L18 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
              <path d="M8 21L6 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
           </svg>
-          <CardTitle className="text-3xl font-bold text-primary">Welcome Back</CardTitle>
-          <CardDescription>Login securely using your username and 5-word seed phrase.</CardDescription>
+          <CardTitle className="text-2xl sm:text-3xl font-bold text-primary">Welcome Back</CardTitle>
+          <CardDescription className="text-sm sm:text-base">Login securely using your username and 5-word seed phrase.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 sm:space-y-6">
               <FormField
                 control={form.control}
                 name="username"
@@ -155,7 +164,7 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>Username</FormLabel>
                     <FormControl>
-                      <Input placeholder="Your username" {...field} className="bg-secondary/30 border-primary/30 focus:ring-primary/50" />
+                      <Input placeholder="Your username" {...field} className="bg-secondary/30 border-primary/30 focus:ring-primary/50 h-11 sm:h-10" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -173,8 +182,11 @@ export default function LoginPage() {
                       <Textarea
                         placeholder="Enter your 5 secret words separated by spaces"
                         {...field}
-                        className="bg-secondary/30 border-primary/30 focus:ring-primary/50 min-h-[100px] tracking-wider" // Removed font-mono
+                        className="bg-secondary/30 border-primary/30 focus:ring-primary/50 min-h-[100px] tracking-wider text-base sm:text-sm" // Use text-base for better mobile readability
                         rows={3}
+                        autoCapitalize="none" // Prevent auto-capitalization
+                        autoCorrect="off" // Disable auto-correct
+                        spellCheck="false" // Disable spell check
                       />
                     </FormControl>
                      <FormMessage />
@@ -183,7 +195,7 @@ export default function LoginPage() {
                 )}
               />
 
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoading}>
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-11 sm:h-10 text-base sm:text-sm" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Login
               </Button>

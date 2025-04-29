@@ -8,6 +8,7 @@ import { MessageSquare, Settings, ImagePlus, Send } from 'lucide-react'; // Adde
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast'; // Import useToast
 import { Textarea } from '@/components/ui/textarea'; // Import Textarea
+import Image from 'next/image'; // Import next/image
 
 // Placeholder for Home Feed functionality
 // In a real app, this would fetch posts from mutual followers
@@ -74,16 +75,16 @@ export default function HomePage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold">Home Feed</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold">Home Feed</h1>
         <div className="flex space-x-2">
           <Link href="/messages" passHref>
-             <Button variant="outline" size="icon" aria-label="Messages">
-               <MessageSquare className="h-5 w-5" />
+             <Button variant="outline" size="icon" aria-label="Messages" className="h-9 w-9 sm:h-10 sm:w-10">
+               <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" />
              </Button>
           </Link>
           <Link href="/settings" passHref>
-             <Button variant="outline" size="icon" aria-label="Settings">
-               <Settings className="h-5 w-5" />
+             <Button variant="outline" size="icon" aria-label="Settings" className="h-9 w-9 sm:h-10 sm:w-10">
+               <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
              </Button>
           </Link>
         </div>
@@ -91,10 +92,10 @@ export default function HomePage() {
 
       {/* Post Upload Section */}
       <Card className="mb-6 shadow-md border-primary/10">
-         <CardHeader>
+         <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-lg">Create Post</CardTitle>
          </CardHeader>
-         <CardContent>
+         <CardContent className="p-4 sm:p-6 pt-0">
             <Textarea // Use Textarea component
                 placeholder="What's on your mind? (Keep it secure!)"
                 className="w-full p-2 rounded-md bg-secondary/30 border border-primary/20 focus:ring-primary/50 min-h-[100px] mb-3" // Increased min-height slightly
@@ -102,16 +103,17 @@ export default function HomePage() {
                 onChange={(e) => setPostContent(e.target.value)}
             />
             <div className="flex justify-between items-center">
-                 <Button variant="ghost" size="sm" onClick={handleAddMedia} className="text-muted-foreground hover:text-foreground">
-                     <ImagePlus className="mr-2 h-4 w-4" /> Add Media
+                 <Button variant="ghost" size="sm" onClick={handleAddMedia} className="text-muted-foreground hover:text-foreground p-2">
+                     <ImagePlus className="mr-1 sm:mr-2 h-4 w-4" />
+                     <span className="hidden sm:inline">Add Media</span>
                  </Button>
                 <Button
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground px-3 py-1.5 sm:px-4 sm:py-2"
                     size="sm"
                     onClick={handlePostSubmit}
                     disabled={!postContent.trim()} // Disable if no content
                 >
-                    <Send className="mr-2 h-4 w-4" /> Post
+                    <Send className="mr-1 sm:mr-2 h-4 w-4" /> Post
                 </Button>
             </div>
          </CardContent>
@@ -120,24 +122,34 @@ export default function HomePage() {
 
       {posts.map((post) => (
         <Card key={post.id} className="shadow-md border-primary/10 overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between p-4">
-            <div className="flex items-center space-x-3">
+          <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4">
+            <div className="flex items-center space-x-2 sm:space-x-3">
                {/* Placeholder Avatar */}
-               <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-secondary flex items-center justify-center text-primary-foreground font-semibold">
+               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-tr from-primary to-secondary flex items-center justify-center text-primary-foreground font-semibold text-sm sm:text-base">
                 {post.username.substring(0, 1).toUpperCase()}
                </div>
                <div>
-                 <p className="font-semibold text-foreground">{post.username}</p>
+                 <p className="font-semibold text-sm sm:text-base text-foreground">{post.username}</p>
                  <p className="text-xs text-muted-foreground">{post.timestamp}</p>
                </div>
             </div>
             {/* More options icon placeholder */}
             {/* <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button> */}
           </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <p className="mb-4 whitespace-pre-wrap">{post.content}</p> {/* Added whitespace-pre-wrap */}
+          <CardContent className="p-3 sm:p-4 pt-0">
+            <p className="mb-3 sm:mb-4 whitespace-pre-wrap text-sm sm:text-base">{post.content}</p> {/* Added whitespace-pre-wrap */}
             {post.image && (
-               <img src={post.image} alt="Post image" className="rounded-lg w-full object-cover aspect-video border border-primary/10"/>
+               <div className="relative w-full aspect-[4/3] sm:aspect-video overflow-hidden rounded-lg border border-primary/10">
+                   <Image
+                       src={post.image}
+                       alt="Post image"
+                       fill // Use fill to make image cover the container
+                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 600px" // Provide sizes for optimization
+                       style={{ objectFit: 'cover' }} // Ensure image covers the area
+                       className="rounded-lg"
+                       priority={post.id === 1} // Prioritize loading the first image
+                    />
+                </div>
             )}
           </CardContent>
            {/* Placeholder for like/comment actions */}
@@ -158,4 +170,3 @@ export default function HomePage() {
     </div>
   );
 }
-
