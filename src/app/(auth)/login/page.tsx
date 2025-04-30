@@ -211,8 +211,16 @@ export default function LoginPage() {
               Sign Up
             </Link>
           </p>
+           {/* Added note about no recovery */}
+           <p className="mt-4 text-center text-xs text-muted-foreground">
+              <strong>Note:</strong> Account recovery is not possible if you lose your seed phrase.
+              <Link href="/no-recovery-info" className="underline hover:text-primary ml-1">
+                Learn why.
+              </Link>
+           </p>
         </CardContent>
       </Card>
     </motion.div>
   );
 }
+

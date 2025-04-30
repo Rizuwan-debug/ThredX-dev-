@@ -122,10 +122,10 @@ export default function SignupPage() {
       setGeneratedSeedPhrase(seed);
       form.setValue("seedPhrase", seed); // Store generated phrase in form state
       toast({
-        title: "5-Word Seed Phrase Generated",
-        description: "Please copy and save these 5 words securely. You WILL need them to log in. Treat them like a password.",
+        title: "Seed Phrase Generated - IMPORTANT!",
+        description: "Please copy and save these 5 words securely OFFLINE. You WILL need them to log in.",
         variant: "default",
-        duration: 10000, // Give more time to read/copy
+        duration: 15000, // Increased duration
       });
     } catch (error) {
       console.error("Seed generation failed:", error);
@@ -143,7 +143,7 @@ export default function SignupPage() {
     if (generatedSeedPhrase) {
       navigator.clipboard.writeText(generatedSeedPhrase)
         .then(() => {
-          toast({ title: 'Copied!', description: 'Seed phrase copied to clipboard.' });
+          toast({ title: 'Copied!', description: 'Seed phrase copied to clipboard. Make sure to save it securely offline.' });
         })
         .catch(err => {
           console.error('Failed to copy seed phrase: ', err);
@@ -169,7 +169,7 @@ export default function SignupPage() {
       if (result.success) {
         toast({
           title: "Signup Successful",
-          description: result.message || "Redirecting to login...",
+          description: "Remember to keep your seed phrase safe! Redirecting to login...",
         });
         router.push("/login");
       } else {
@@ -200,8 +200,8 @@ export default function SignupPage() {
     >
       <Card className="w-full max-w-md shadow-2xl border-primary/20">
         <CardHeader className="text-center p-4 sm:p-6">
-           {/* Removed sm:width and sm:height attributes */}
-           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto mb-2 text-primary">
+          {/* Removed sm:width and sm:height attributes */}
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto mb-2 text-primary">
              <path d="M21 8L16 3H8L3 8V16L8 21H16L21 16V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
              <path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" stroke="currentColor" strokeWidth="2"/>
              <path d="M12 3V6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
@@ -214,7 +214,7 @@ export default function SignupPage() {
              <path d="M8 3L6 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
              <path d="M16 21L18 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
              <path d="M8 21L6 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-           </svg>
+          </svg>
           <CardTitle className="text-2xl sm:text-3xl font-bold text-primary">ThredX</CardTitle>
           <CardDescription className="text-sm sm:text-base">Create your secure account. Your Privacy, Our Priority.</CardDescription>
         </CardHeader>
@@ -264,23 +264,18 @@ export default function SignupPage() {
                              <Copy className="h-4 w-4" />
                           </Button>
                        </div>
+                        {/* Updated Warning */}
                         <Alert variant="destructive" className="p-3 sm:p-4">
                            <AlertTriangle className="h-4 w-4" />
-                           <AlertTitle className="text-sm sm:text-base">Critical Security Warning</AlertTitle>
+                           <AlertTitle className="text-sm sm:text-base font-bold">EXTREMELY IMPORTANT</AlertTitle>
                            <AlertDescription className="text-xs sm:text-sm">
-                             <strong>Save this 5-word seed phrase securely NOW.</strong> Write it down, store it offline.
-                             Anyone with this phrase can access your account. <strong>There is NO recovery if you lose it.</strong> Treat it like your most valuable password.
+                             <strong>Save this 5-word seed phrase securely OFFLINE immediately.</strong> This is the ONLY way to access your account.
+                             <br />
+                             <strong>If you lose this phrase, YOUR ACCOUNT CANNOT BE RECOVERED.</strong> We do not store it and cannot help you regain access.
+                             <br />
+                             Treat it like your most valuable physical key. Do not share it with anyone.
                            </AlertDescription>
                        </Alert>
-                       {/* Removed the developer note for production feel
-                       <Alert variant="warning">
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertTitle>Developer Note</AlertTitle>
-                            <AlertDescription>
-                                This uses a simple random word list for demo purposes. A production app should use a standard, cryptographically secure method like BIP39 for generating mnemonic phrases.
-                            </AlertDescription>
-                        </Alert>
-                        */}
                     </div>
                  )}
                   {/* FormMessage for the seedPhrase field (e.g., if validation was added) */}
@@ -304,8 +299,16 @@ export default function SignupPage() {
               Login
             </Link>
           </p>
+           {/* Link to information about why there's no recovery */}
+           <p className="mt-4 text-center text-xs text-muted-foreground">
+             Why no account recovery?{' '}
+             <Link href="/no-recovery-info" className="underline hover:text-primary">
+               Learn more
+             </Link>
+           </p>
         </CardContent>
       </Card>
     </motion.div>
   );
 }
+
