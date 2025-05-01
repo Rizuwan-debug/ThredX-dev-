@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react"; // Import useEffect
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,8 +25,9 @@ import Link from 'next/link';
 import { Textarea } from "@/components/ui/textarea"; // Use Textarea for Seed Phrase
 
 // Placeholder for authentication function - replace with actual implementation
-const authenticateUser = async (username: string, seedPhraseWords: string) => {
-  console.log("Attempting to authenticate user:", username);
+// This function now runs entirely client-side due to localStorage access.
+const authenticateUser = async (username: string, seedPhraseWords: string): Promise<{ success: boolean; message: string }> => {
+  console.log("Attempting to authenticate user (DEMO):", username);
   // WARNING: In a real application:
   // 1. DO NOT log the username or seed phrase.
   // 2. This function should take the seed phrase (or ideally, a password derived from it),
@@ -34,38 +35,38 @@ const authenticateUser = async (username: string, seedPhraseWords: string) => {
   //    fetch the stored *hash* for the user from a secure backend, and compare the derived key hash with the stored hash.
   // 3. NEVER compare the raw seed phrase directly. Never store the raw seed phrase on the server.
   // 4. Implement secure session management (e.g., JWT, secure cookies).
-  // This simulates checking credentials.
-  await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 500)); // Simulate slight delay
 
-  // **DEMO ONLY:** Check if username is not empty and the input looks like 5 words.
-  // **THIS IS NOT SECURE AUTHENTICATION AND DOES NOT VALIDATE AGAINST SIGNUP DATA**
-  // It allows login for *any* non-empty username if the seed phrase format is correct.
+  // Validate input format client-side
   const words = seedPhraseWords.trim().split(/\s+/); // Split by whitespace
   const isValidFormat = words.length === 5 && words.every(word => word.length > 0);
 
-  // Simulate retrieval of stored data (SHOULD BE HASHED in reality)
-  // In this demo, we assume the signup data is implicitly 'known' if format is correct.
+  if (!isValidFormat) {
+    return { success: false, message: "Seed phrase must be exactly 5 non-empty words separated by spaces." };
+  }
+
+  // Retrieve stored data from localStorage (Client-side only)
+  // This is inherently insecure for production but used for the demo.
   const storedUsername = localStorage.getItem('thredx_username');
-  const storedSeedPhrase = localStorage.getItem('thredx_seedPhrase'); // Storing raw seed phrase is BAD PRACTICE - demo only!
+  const storedSeedPhrase = localStorage.getItem('thredx_seedPhrase'); // Storing raw seed phrase is BAD PRACTICE!
 
   // **VERY INSECURE DEMO LOGIN LOGIC:**
-  // Simply checks if the provided username matches the one stored during signup
-  // AND if the provided seed phrase matches the one stored during signup.
-  if (username === storedUsername && seedPhraseWords === storedSeedPhrase && isValidFormat) {
+  // Directly compare stored values.
+  if (!storedUsername || !storedSeedPhrase) {
+    return { success: false, message: "No signup data found in browser storage (Demo). Please sign up first." };
+  }
+
+  if (username === storedUsername && seedPhraseWords === storedSeedPhrase) {
       console.log("Demo authentication successful for:", username);
-      localStorage.setItem('thredx_currentUser', username); // Store username for demo persistence
+      localStorage.setItem('thredx_currentUser', username); // Persist demo login state
       return { success: true, message: "Login successful! (Demo Mode)" };
   } else {
       console.log("Demo authentication failed for:", username);
       let message = "Invalid username or seed phrase.";
-       if (!storedUsername || !storedSeedPhrase) {
-           message = "No signup data found (Demo). Please sign up first.";
-       } else if (username !== storedUsername) {
+       if (username !== storedUsername) {
            message = "Username does not match signup data (Demo)."
        } else if (seedPhraseWords !== storedSeedPhrase) {
            message = "Seed phrase does not match signup data (Demo)."
-       } else if (!isValidFormat) {
-        message = "Seed phrase must be exactly 5 non-empty words separated by spaces.";
        }
       return { success: false, message: message };
   }
@@ -89,6 +90,12 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isClient, setIsClient] = useState(false); // State to track client-side mounting
+
+  useEffect(() => {
+    // Set isClient to true once the component mounts on the client
+    setIsClient(true);
+  }, []);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(formSchema),
@@ -99,9 +106,11 @@ export default function LoginPage() {
   });
 
   const onSubmit = async (values: LoginFormValues) => {
+    if (!isClient) return; // Prevent submission during SSR or before hydration
+
     setIsLoading(true);
     try {
-      // Pass the 5-word seed phrase to the authentication function
+      // Call the client-side authentication function
       const result = await authenticateUser(values.username, values.seedPhrase);
       if (result.success) {
         toast({
@@ -109,13 +118,12 @@ export default function LoginPage() {
           description: result.message,
         });
         // TODO: Implement REAL session management (e.g., set cookie/token via backend API call)
-        // Redirect to a protected route (e.g., home feed)
-        router.push("/home"); // Redirect to home page on successful login
+        router.push("/home"); // Redirect to home page
       } else {
          toast({
            variant: "destructive",
            title: "Login Failed",
-           description: result.message || "Invalid username or seed phrase.",
+           description: result.message, // Use the specific error message
          });
       }
     } catch (error) {
@@ -139,20 +147,21 @@ export default function LoginPage() {
     >
       <Card className="w-full max-w-md shadow-2xl border-primary/20">
         <CardHeader className="text-center p-4 sm:p-6">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto mb-2 text-primary">
-             {/* Reusing the same icon as Signup */}
+          {/* SVG Icon - Removed responsive size attributes, rely on className */}
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto mb-2 text-primary h-10 w-10 sm:h-12 sm:w-12">
              <path d="M21 8L16 3H8L3 8V16L8 21H16L21 16V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
              <path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" stroke="currentColor" strokeWidth="2"/>
-             <path d="M12 3V6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-             <path d="M12 18V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-             <path d="M21 8H18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-             <path d="M6 8H3" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-             <path d="M18 16H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-             <path d="M3 16H6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-             <path d="M16 3L18 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-             <path d="M8 3L6 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-             <path d="M16 21L18 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-             <path d="M8 21L6 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+             {/* Decorative paths */}
+             <path d="M12 3V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+             <path d="M12 18V21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+             <path d="M21 8H18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+             <path d="M6 8H3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+             <path d="M18 16H21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+             <path d="M3 16H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+             <path d="M16 3L18 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+             <path d="M8 3L6 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+             <path d="M16 21L18 19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+             <path d="M8 21L6 19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
           <CardTitle className="text-2xl sm:text-3xl font-bold text-primary">Welcome Back</CardTitle>
           <CardDescription className="text-sm sm:text-base">Login securely using your username and 5-word seed phrase.</CardDescription>
@@ -181,15 +190,15 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>5-Word Seed Phrase</FormLabel>
                     <FormControl>
-                      {/* Using Textarea is still okay for pasting multiple words */}
+                      {/* Using Textarea for potentially easier pasting */}
                       <Textarea
                         placeholder="Enter your 5 secret words separated by spaces"
                         {...field}
-                        className="bg-secondary/30 border-primary/30 focus:ring-primary/50 min-h-[100px] tracking-wider text-base sm:text-sm" // Use text-base for better mobile readability
+                        className="bg-secondary/30 border-primary/30 focus:ring-primary/50 min-h-[100px] tracking-wider text-base sm:text-sm resize-none" // Added resize-none
                         rows={3}
-                        autoCapitalize="none" // Prevent auto-capitalization
-                        autoCorrect="off" // Disable auto-correct
-                        spellCheck="false" // Disable spell check
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck="false"
                         aria-required="true"
                       />
                     </FormControl>
@@ -199,7 +208,12 @@ export default function LoginPage() {
                 )}
               />
 
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-11 sm:h-10 text-base sm:text-sm" disabled={isLoading}>
+              <Button
+                 type="submit"
+                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-11 sm:h-10 text-base sm:text-sm"
+                 // Disable button during SSR/hydration or while loading
+                 disabled={!isClient || isLoading}
+              >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Login
               </Button>

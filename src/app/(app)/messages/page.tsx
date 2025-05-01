@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton for load
 
 // --- Mock Data Structure ---
 interface Message {
-  id: number;
+  id: number | string; // Allow string for optimistic IDs
   sender: string;
   text: string;
   timestamp: string;
@@ -79,12 +79,15 @@ const allMessages: { [key: number]: Message[] } = {
 // Keep track of the selected conversation ID
 const initialSelectedConversationId = conversations.length > 0 ? conversations[0].id : null; // Select first convo if exists
 
+// Counter for unique optimistic message IDs
+let optimisticIdCounter = 0;
+
 export default function MessagesPage() {
   const { toast } = useToast();
   const [messageInput, setMessageInput] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(initialSelectedConversationId);
-  const [messages, setMessages] = useState<Message[]>(selectedConversationId ? (allMessages[selectedConversationId] || []) : []);
-  const [loadingMessages, setLoadingMessages] = useState<boolean>(selectedConversationId !== null); // Initially true if a convo is selected
+  const [messages, setMessages] = useState<Message[]>([]); // Initialize empty
+  const [loadingMessages, setLoadingMessages] = useState<boolean>(false); // Start false
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const messageEndRef = useRef<HTMLDivElement>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null); // Ref for chat area scrolling
@@ -96,39 +99,43 @@ export default function MessagesPage() {
   );
 
   // Function to scroll chat area to bottom
-  const scrollToBottom = useCallback(() => {
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
     // Use timeout to ensure DOM update is complete before scrolling
     setTimeout(() => {
-        // Prioritize scrolling the messageEndRef into view if it exists
         if (messageEndRef.current) {
-             messageEndRef.current.scrollIntoView({ behavior: 'auto', block: 'end' }); // Use 'auto' for faster scroll on load
+             messageEndRef.current.scrollIntoView({ behavior: behavior, block: 'end' });
         } else if (chatAreaRef.current) {
-            // Fallback to scrolling the container if end ref isn't ready (less precise)
              chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
         }
-    }, 50); // Slightly increased delay to allow rendering
+    }, 50); // Short delay
   }, []);
 
-  // Effect to load messages and scroll when conversation changes
+  // Effect to load messages when conversation changes
   useEffect(() => {
+      let isMounted = true;
       if (selectedConversationId) {
           setLoadingMessages(true);
-          setMessages([]); // Clear immediately
+          // Avoid clearing messages immediately to prevent flash
+          // setMessages([]);
 
           // Simulate fetching messages with delay
           const timer = setTimeout(() => {
+              if (!isMounted) return; // Prevent state update if unmounted
               const fetchedMessages = allMessages[selectedConversationId] || [];
               setMessages(fetchedMessages);
               setLoadingMessages(false);
-              scrollToBottom(); // Scroll after new messages are rendered
-          }, 300); // Reduced delay for snappier feel
+              scrollToBottom('auto'); // Scroll quickly on load
+          }, 300); // Simulate network delay
 
-          return () => clearTimeout(timer);
+          return () => {
+              isMounted = false;
+              clearTimeout(timer);
+          }
       } else {
-          setMessages([]);
-          setLoadingMessages(false); // No chat selected, not loading
+          setMessages([]); // Clear if no conversation is selected
+          setLoadingMessages(false);
       }
-  }, [selectedConversationId, scrollToBottom]);
+  }, [selectedConversationId, scrollToBottom]); // Dependency on ID and scroll function
 
 
   const handleSendMessage = useCallback(() => {
@@ -139,36 +146,50 @@ export default function MessagesPage() {
     const encryptMessage = (text: string) => `ENC(${text})`; // Simple placeholder
     const encryptedText = encryptMessage(trimmedMessage);
 
+    // Generate a unique optimistic ID
+    const optimisticId = `optimistic-${optimisticIdCounter++}`;
+
     // Optimistic update
     const newMessage: Message = {
-        id: Date.now(),
+        id: optimisticId, // Use unique optimistic ID
         sender: 'You',
         text: trimmedMessage, // Display original text optimistically
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         isOwn: true,
     };
+
+    // Add the new message to the current state
     setMessages(prevMessages => [...prevMessages, newMessage]);
 
-    // Update mock data store (for demo persistence)
-    if (!allMessages[selectedConversation.id]) {
+    // Simulate adding to mock data store (with encrypted text)
+    // This should happen *after* a successful backend call in a real app
+    // For demo, we add it here but would ideally replace the optimistic message later
+    const messageForStorage = {
+      ...newMessage,
+      id: Date.now(), // In a real app, use the ID from the backend response
+      text: encryptedText
+    };
+     if (!allMessages[selectedConversation.id]) {
         allMessages[selectedConversation.id] = [];
-    }
-    // Store the "encrypted" version in mock data
-    allMessages[selectedConversation.id].push({ ...newMessage, text: encryptedText });
+     }
+    allMessages[selectedConversation.id].push(messageForStorage);
+
 
     setMessageInput('');
-    // Scroll immediately after setting state for better responsiveness
-    scrollToBottom();
+    // Scroll smoothly after adding the new message
+    scrollToBottom('smooth');
 
 
-    // Placeholder: Simulate backend confirmation (no visual change needed on success for optimistic update)
+    // Placeholder: Simulate backend confirmation
     console.log(`Sending encrypted message "${encryptedText}" to ${selectedConversation.username}`);
-    // toast({ title: 'Message Sent', duration: 2000 }); // Optional: short confirmation
-
     // In a real app:
     // 1. Use actual encryption library (libsodium, Web Crypto API) here.
     // 2. Call API to send the encrypted message.
-    // 3. On API error, revert optimistic update or show error state on the message.
+    // 3. On API success, update the optimistic message with the real ID and confirmed state:
+    //    setMessages(prev => prev.map(msg => msg.id === optimisticId ? { ...msg, id: realIdFromBackend } : msg));
+    // 4. On API error, revert optimistic update or show error state on the message:
+    //    setMessages(prev => prev.filter(msg => msg.id !== optimisticId));
+    //    toast({ variant: 'destructive', title: 'Failed to send' });
 
   }, [messageInput, selectedConversation, loadingMessages, toast, scrollToBottom]);
 
@@ -177,25 +198,25 @@ export default function MessagesPage() {
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    // Check if Enter key is pressed and Shift key is not
     if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault(); // Prevent newline in input
-      handleSendMessage();
+      event.preventDefault(); // Prevent adding a newline in the input field
+      handleSendMessage(); // Call the send message handler
     }
   };
 
    const selectConversation = useCallback((id: number) => {
       if (id === selectedConversationId) return; // Prevent re-selecting the same chat
 
-       // No need to check loadingMessages here, state update will handle it
-
       setSelectedConversationId(id);
       setMessageInput(''); // Clear input
-      // Message loading and clearing is handled by the useEffect hook
+      // Message loading is handled by the useEffect hook based on selectedConversationId change
 
-      if (window.innerWidth < 768) { // Close sidebar on mobile after selection
+      // Close sidebar on mobile after selection for better UX
+      if (window.innerWidth < 768) {
           setIsSidebarOpen(false);
       }
-  }, [selectedConversationId]); // Removed loadingMessages and scrollToBottom dependencies
+  }, [selectedConversationId]);
 
   // Skeleton loader for conversations list
   const ConversationListSkeleton = () => (
@@ -225,10 +246,12 @@ export default function MessagesPage() {
    );
 
   // Calculate height dynamically using CSS variables, providing fallbacks
-  const chatHeight = 'h-[calc(100vh-var(--header-height,4rem)-theme(spacing.12))] md:h-[calc(100vh-var(--header-height,4rem)-theme(spacing.16))]';
+  // Using fixed height to avoid layout shifts during loading or dynamic content changes
+  const chatContainerHeight = "h-[calc(100vh-10rem)]"; // Example: Adjust 10rem based on header/footer/padding
 
   return (
-    <div className={cn("flex overflow-hidden border border-primary/10 rounded-lg shadow-lg", chatHeight)}>
+    // Use a more specific height calculation or a fixed height approach
+    <div className={cn("flex overflow-hidden border border-primary/10 rounded-lg shadow-lg", chatContainerHeight)}>
       {/* Conversation List Sidebar */}
       <aside
         className={cn(
@@ -245,27 +268,26 @@ export default function MessagesPage() {
             </Button>
          </div>
          <div className="flex-1 overflow-y-auto" role="navigation" aria-labelledby="chat-list-heading">
-             {/* Add a loading state for conversation list if needed */}
              {conversations.map((convo) => (
                <div
-                 key={convo.id}
+                 key={convo.id} // Use stable ID from data
                  className={cn(
                      `p-3 sm:p-4 flex items-center space-x-2 sm:space-x-3 cursor-pointer hover:bg-secondary/30 transition-colors duration-150 border-b border-primary/5 last:border-b-0 relative`, // Added relative positioning
                      selectedConversationId === convo.id ? 'bg-primary/10' : '',
-                     // loadingMessages ? 'opacity-50 cursor-wait' : '' // Loading indication removed, handled by chat area skeleton
                  )}
                  onClick={() => selectConversation(convo.id)}
                  role="button"
-                 tabIndex={0}
-                 onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && selectConversation(convo.id)}
+                 tabIndex={0} // Make it focusable
+                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') selectConversation(convo.id); }}
                  aria-current={selectedConversationId === convo.id ? "page" : undefined}
+                 aria-label={`Chat with ${convo.username}`} // Accessibility label
                >
                   {/* Avatar Container */}
                   <div className="relative flex-shrink-0">
                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-tr from-primary to-secondary flex items-center justify-center text-primary-foreground font-semibold text-sm sm:text-base" aria-hidden="true">
                          {convo.avatarInitial}
                      </div>
-                     {/* Activation Mark (Online Status) - Light Blue */}
+                     {/* Activation Mark (Online Status) */}
                      {convo.isOnline && (
                          <span
                              className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-sky-400 ring-2 ring-background"
@@ -273,9 +295,9 @@ export default function MessagesPage() {
                              title="Online"
                           />
                       )}
-                     {/* Group/Bot Icons (Optional, keep if needed) */}
-                     {convo.username.includes('group') && <Users className="absolute bottom-0 right-0 h-3 w-3 text-background/70 bg-foreground/50 rounded-full p-0.5" />}
-                     {convo.username.includes('bot') && <svg className="absolute bottom-0 right-0 h-3 w-3 text-background/70 bg-foreground/50 rounded-full p-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-4 0V4a2 2 0 0 1 2-2zM8 11a4 4 0 1 0 8 0H8zm8 0a4 4 0 0 0-8 0v3a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-3zM5 18a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v1a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-1z"/></svg>}
+                     {/* Group/Bot Icons */}
+                     {convo.username.includes('group') && <Users className="absolute bottom-0 right-0 h-3 w-3 text-background/70 bg-foreground/50 rounded-full p-0.5" aria-label="Group chat" />}
+                     {convo.username.includes('bot') && <svg className="absolute bottom-0 right-0 h-3 w-3 text-background/70 bg-foreground/50 rounded-full p-0.5" viewBox="0 0 24 24" fill="currentColor" aria-label="Bot"><path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-4 0V4a2 2 0 0 1 2-2zM8 11a4 4 0 1 0 8 0H8zm8 0a4 4 0 0 0-8 0v3a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-3zM5 18a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v1a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-1z"/></svg>}
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -295,10 +317,12 @@ export default function MessagesPage() {
       {/* Chat Area */}
       <main
         className={cn(
-          "flex-1 flex flex-col bg-background overflow-hidden",
-          // Opacity transition removed for faster perceived loading
+          "flex-1 flex flex-col bg-background overflow-hidden transition-opacity duration-300",
+           // Control opacity during loading
+           loadingMessages ? "opacity-50" : "opacity-100"
         )}
         aria-live="polite" // Announce changes in content, like new messages
+        aria-busy={loadingMessages} // Indicate loading state
       >
         {selectedConversation ? (
           <>
@@ -322,12 +346,12 @@ export default function MessagesPage() {
                           />
                       )}
                     {/* Group/Bot Icons */}
-                    {selectedConversation.username.includes('group') && <Users className="absolute bottom-0 right-0 h-3 w-3 text-background/70 bg-foreground/50 rounded-full p-0.5" />}
-                    {selectedConversation.username.includes('bot') && <svg className="absolute bottom-0 right-0 h-3 w-3 text-background/70 bg-foreground/50 rounded-full p-0.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-4 0V4a2 2 0 0 1 2-2zM8 11a4 4 0 1 0 8 0H8zm8 0a4 4 0 0 0-8 0v3a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-3zM5 18a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v1a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-1z"/></svg>}
+                    {selectedConversation.username.includes('group') && <Users className="absolute bottom-0 right-0 h-3 w-3 text-background/70 bg-foreground/50 rounded-full p-0.5" aria-label="Group chat" />}
+                    {selectedConversation.username.includes('bot') && <svg className="absolute bottom-0 right-0 h-3 w-3 text-background/70 bg-foreground/50 rounded-full p-0.5" viewBox="0 0 24 24" fill="currentColor" aria-label="Bot"><path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-4 0V4a2 2 0 0 1 2-2zM8 11a4 4 0 1 0 8 0H8zm8 0a4 4 0 0 0-8 0v3a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-3zM5 18a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v1a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-1z"/></svg>}
                </div>
                <div>
                   <h2 className="text-base sm:text-lg font-semibold">{selectedConversation.username}</h2>
-                   {/* Status Text (Optional) */}
+                   {/* Status Text */}
                    {selectedConversation.isOnline ? (
                         <p className="text-xs text-sky-400">Online</p>
                    ) : (
@@ -340,21 +364,24 @@ export default function MessagesPage() {
              {loadingMessages ? (
                  <MessageAreaSkeleton />
              ) : (
-                <div ref={chatAreaRef} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 bg-secondary/10">
+                // Use key to force re-render/remount on conversation change, helping with scroll reset
+                <div key={selectedConversationId} ref={chatAreaRef} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 bg-secondary/10">
                   {messages.length === 0 ? (
                     <div className="text-center text-muted-foreground py-10">No messages yet. Start the conversation!</div>
                   ) : (
                     messages.map((msg) => (
                       <div
+                        // Ensure msg.id is unique, especially with optimistic updates
                         key={msg.id}
                         className={`flex ${msg.isOwn ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
-                          className={`max-w-[80%] sm:max-w-[70%] p-2 sm:p-3 rounded-lg shadow-sm break-words ${ // Reduced shadow
+                          className={cn(
+                            "max-w-[80%] sm:max-w-[70%] p-2 sm:p-3 rounded-lg shadow-sm break-words", // Reduced shadow
                             msg.isOwn
                               ? 'bg-primary text-primary-foreground rounded-br-none'
                               : 'bg-card text-card-foreground rounded-bl-none'
-                          }`}
+                          )}
                         >
                           {/* Placeholder: Decrypt message before display */}
                           <p className="text-sm sm:text-base">{msg.text.startsWith('ENC(') ? msg.text.substring(4, msg.text.length - 1) : msg.text}</p>
@@ -363,37 +390,36 @@ export default function MessagesPage() {
                       </div>
                     ))
                   )}
-                  <div ref={messageEndRef} className="h-0"/> {/* Scroll target, height 0 */}
+                  {/* Explicit scroll target */}
+                  <div ref={messageEndRef} style={{ height: '1px' }} />
                 </div>
              )}
 
 
             {/* Message Input */}
             <div className="p-3 sm:p-4 border-t border-primary/10 bg-background flex-shrink-0">
-              <div className="flex items-center space-x-2">
-                 {/* Placeholder for attachments later */}
-                 {/* <Button variant="ghost" size="icon" aria-label="Attach file"><Paperclip className="h-5 w-5" /></Button> */}
+              <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center space-x-2">
                  <Input
-                   type="text" // Ensure correct type
+                   type="text"
                    placeholder="Type your encrypted message..."
                    className="flex-1 bg-secondary/30 border-primary/20 focus:ring-primary/50 h-10 text-sm sm:text-base"
                    value={messageInput}
                    onChange={handleInputChange}
                    onKeyDown={handleKeyDown} // Use onKeyDown for Enter key
-                   disabled={loadingMessages}
+                   disabled={loadingMessages || !selectedConversation}
                    aria-label="Message input"
-                   aria-autocomplete="off" // Assuming no autocomplete is desired here
+                   autoComplete="off"
                  />
                  <Button
+                   type="submit" // Use submit type for form
                    className="bg-primary hover:bg-primary/90 text-primary-foreground h-10 w-10 flex-shrink-0"
                    size="icon"
                    aria-label="Send message"
-                   onClick={handleSendMessage}
-                   disabled={!messageInput.trim() || loadingMessages}
+                   disabled={!messageInput.trim() || loadingMessages || !selectedConversation}
                  >
                    {loadingMessages ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
                  </Button>
-              </div>
+              </form>
             </div>
           </>
         ) : (
