@@ -139,7 +139,6 @@ export default function LoginPage() {
     >
       <Card className="w-full max-w-md shadow-2xl border-primary/20">
         <CardHeader className="text-center p-4 sm:p-6">
-          {/* Removed sm:width and sm:height attributes */}
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto mb-2 text-primary">
              {/* Reusing the same icon as Signup */}
              <path d="M21 8L16 3H8L3 8V16L8 21H16L21 16V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -168,7 +167,7 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>Username</FormLabel>
                     <FormControl>
-                      <Input placeholder="Your username" {...field} className="bg-secondary/30 border-primary/30 focus:ring-primary/50 h-11 sm:h-10" />
+                      <Input placeholder="Your username" {...field} className="bg-secondary/30 border-primary/30 focus:ring-primary/50 h-11 sm:h-10" aria-required="true" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -191,6 +190,7 @@ export default function LoginPage() {
                         autoCapitalize="none" // Prevent auto-capitalization
                         autoCorrect="off" // Disable auto-correct
                         spellCheck="false" // Disable spell check
+                        aria-required="true"
                       />
                     </FormControl>
                      <FormMessage />
@@ -211,7 +211,7 @@ export default function LoginPage() {
               Sign Up
             </Link>
           </p>
-           {/* Added note about no recovery */}
+           {/* Link back to info page reinforces the no-recovery model */}
            <p className="mt-4 text-center text-xs text-muted-foreground">
               <strong>Note:</strong> Account recovery is not possible if you lose your seed phrase.
               <Link href="/no-recovery-info" className="underline hover:text-primary ml-1">
@@ -223,4 +223,3 @@ export default function LoginPage() {
     </motion.div>
   );
 }
-

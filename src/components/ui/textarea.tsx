@@ -1,9 +1,11 @@
+
 import * as React from 'react';
 
 import {cn} from '@/lib/utils';
 
-const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<'textarea'>>(
-  ({className, ...props}, ref) => {
+// Update props type to include TextareaHTMLAttributes
+const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
+  ({className, 'aria-required': ariaRequired, ...props}, ref) => { // Extract aria-required
     return (
       <textarea
         className={cn(
@@ -11,6 +13,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<'tex
           className
         )}
         ref={ref}
+        aria-required={ariaRequired} // Apply aria-required
         {...props}
       />
     );

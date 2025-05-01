@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 
 // Change ComponentProps to InputHTMLAttributes to accept standard input props like onKeyDown
 const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
-  ({ className, type, ...props }, ref) => {
+  ({ className, type, 'aria-required': ariaRequired, ...props }, ref) => { // Extract aria-required
     return (
       <input
         type={type}
@@ -14,6 +14,7 @@ const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLI
           className
         )}
         ref={ref}
+        aria-required={ariaRequired} // Apply aria-required
         {...props} // Spread all other props, including event handlers
       />
     )

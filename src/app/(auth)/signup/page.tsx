@@ -228,7 +228,7 @@ export default function SignupPage() {
                   <FormItem>
                     <FormLabel>Username</FormLabel>
                     <FormControl>
-                      <Input placeholder="Choose a unique username" {...field} className="bg-secondary/30 border-primary/30 focus:ring-primary/50 h-11 sm:h-10"/>
+                      <Input placeholder="Choose a unique username" {...field} className="bg-secondary/30 border-primary/30 focus:ring-primary/50 h-11 sm:h-10" aria-required="true" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -252,7 +252,7 @@ export default function SignupPage() {
                  {generatedSeedPhrase && (
                     <div className="mt-2 space-y-2">
                        <div className="relative p-3 bg-muted rounded-md border border-primary/30 group">
-                          <p className="text-base sm:text-lg font-semibold tracking-wider text-center text-foreground/90 break-words">{generatedSeedPhrase}</p>
+                          <p className="text-base sm:text-lg font-semibold tracking-wider text-center text-foreground/90 break-words" aria-live="polite">{generatedSeedPhrase}</p>
                           <Button
                               type="button"
                               variant="ghost"
@@ -311,4 +311,3 @@ export default function SignupPage() {
     </motion.div>
   );
 }
-
