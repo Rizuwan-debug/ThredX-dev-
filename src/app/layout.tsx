@@ -37,7 +37,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning> {/* Apply dark theme globally via class */}
+    <html lang="en" className="dark" suppressHydrationWarning>
+      {/* Apply dark theme globally via class */}
       <body
         className={cn(
           "min-h-screen bg-background font-sans antialiased", // Removed dark class here, it's on <html>
