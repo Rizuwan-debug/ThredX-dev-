@@ -2,6 +2,7 @@
 'use client'; // Mark functions potentially using client-side APIs
 
 import * as bip39 from 'bip39';
+import { Buffer } from 'buffer'; // Ensure Buffer is imported explicitly
 
 // Function to safely access localStorage
 const safeLocalStorage = {
@@ -41,43 +42,60 @@ const USERNAME_KEY = 'thredx_username'; // Key for storing username
  */
 export function generateSeedPhrase(): string {
     const WORD_COUNT_TARGET = 5;
-    const STANDARD_ENTROPY_BITS = 128; // Use standard 128 bits (generates 12 words)
-    const ENTROPY_BYTES = STANDARD_ENTROPY_BITS / 8; // 16 bytes
+    // Ensure entropy bits are a multiple of 32 and between 128-256 for bip39
+    const ENTROPY_BITS = 128; // 128 is valid (results in 12 words)
+    const ENTROPY_BYTES = ENTROPY_BITS / 8; // 16 bytes
 
     let mnemonic: string;
+    let words: string[];
 
-    if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
-        const randomBytes = new Uint8Array(ENTROPY_BYTES);
-        window.crypto.getRandomValues(randomBytes);
-        const entropy = Buffer.from(randomBytes).toString('hex');
-        mnemonic = bip39.entropyToMnemonic(entropy); // Generates 12 words
-    } else {
-        console.error("Secure random number generator not available. Falling back to less secure method. DO NOT use this for production keys.");
-        // Fallback for environments without window.crypto (like older SSR or specific runtimes)
-        // WARNING: This fallback using Math.random is NOT cryptographically secure.
-        const fallbackRandomBytes = new Uint8Array(ENTROPY_BYTES);
-        for (let i = 0; i < ENTROPY_BYTES; i++) {
-            fallbackRandomBytes[i] = Math.floor(Math.random() * 256);
+    try {
+        if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+            const randomBytes = new Uint8Array(ENTROPY_BYTES);
+            window.crypto.getRandomValues(randomBytes);
+            // Pass Buffer directly to entropyToMnemonic
+            mnemonic = bip39.entropyToMnemonic(Buffer.from(randomBytes));
+        } else {
+            console.error("Secure random number generator not available. Falling back to less secure method. DO NOT use this for production keys.");
+            // Fallback for environments without window.crypto (like older SSR or specific runtimes)
+            // WARNING: This fallback using Math.random is NOT cryptographically secure and might still cause issues.
+            const fallbackRandomBytes = new Uint8Array(ENTROPY_BYTES);
+            for (let i = 0; i < ENTROPY_BYTES; i++) {
+                fallbackRandomBytes[i] = Math.floor(Math.random() * 256);
+            }
+             // Pass Buffer directly to entropyToMnemonic
+            mnemonic = bip39.entropyToMnemonic(Buffer.from(fallbackRandomBytes));
         }
-        mnemonic = bip39.entropyToMnemonic(Buffer.from(fallbackRandomBytes).toString('hex')); // Generates 12 words
+
+        words = mnemonic.split(' ');
+
+        // BIP39 word count depends strictly on entropy bits (128->12, 160->15 etc.).
+        // Check if we got the expected number of words for the entropy used.
+        const expectedWordCount = bip39.wordlists.english.length * (ENTROPY_BITS / 11); // This isn't quite right, word count is fixed for entropy length
+        // For 128 bits, it should always be 12 words.
+        if (words.length !== 12) {
+             console.error(`Generated mnemonic has unexpected word count: ${words.length}. Expected 12 for 128 bits.`);
+             // Throw an error or retry, as this indicates a problem with bip39 or the entropy.
+             throw new Error("Mnemonic generation failed: incorrect word count.");
+        }
+
+    } catch (error) {
+        console.error("Error during mnemonic generation:", error);
+        // Attempt to recover or inform the user
+        // For now, rethrow or return a default/error state might be needed
+        // Rethrowing to make the issue visible
+        throw new Error(`Seed phrase generation failed: ${error instanceof Error ? error.message : String(error)}`);
     }
 
-    const words = mnemonic.split(' ');
-
-    // Ensure we actually got 12 words (should always happen with 128 bits)
-    if (words.length < WORD_COUNT_TARGET) {
-        // This case is extremely unlikely with 128 bits but handle defensively
-        console.error("Failed to generate sufficient words from entropy. Retrying.");
-        return generateSeedPhrase(); // Retry generation
-    }
 
     // Take the first 5 words
     const fiveWordPhrase = words.slice(0, WORD_COUNT_TARGET).join(' ');
 
     // Basic check to prevent empty phrase return
     if (!fiveWordPhrase) {
-         console.error("Generated phrase is empty. Retrying.");
-         return generateSeedPhrase(); // Retry generation
+         console.error("Generated phrase is empty after slicing. This should not happen.");
+         // Throw an error as this is unexpected
+         throw new Error("Generated phrase is empty.");
     }
 
     return fiveWordPhrase;
@@ -98,11 +116,12 @@ export function validateSeedPhrase(seedPhrase: string): boolean {
     return false;
   }
   // Optionally, check if words are in the BIP39 english wordlist for better validation
-  // const wordlist = bip39.wordlists.english;
-  // if (!words.every(word => wordlist.includes(word))) {
-  //     console.warn("Validation failed: Phrase contains words not in the standard list.");
-  //     return false;
-  // }
+  const wordlist = bip39.wordlists.english;
+  if (!words.every(word => wordlist.includes(word))) {
+      console.warn("Validation failed: Phrase contains words not in the standard list.");
+      // Consider if this strict check is desired for the 5-word derived phrase
+      // return false;
+  }
   return true; // Passes if it has 5 non-empty words
 }
 
