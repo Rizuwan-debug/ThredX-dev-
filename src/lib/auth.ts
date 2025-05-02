@@ -50,47 +50,64 @@ export function generateSeedPhrase(): string {
     let words: string[];
 
     try {
+        let entropyHex: string;
         if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
             const randomBytes = new Uint8Array(ENTROPY_BYTES);
             window.crypto.getRandomValues(randomBytes);
-            // Convert the Uint8Array to a hex string for bip39
-            const entropyHex = Buffer.from(randomBytes).toString('hex'); // Correct conversion
-            mnemonic = bip39.entropyToMnemonic(entropyHex); // Pass the hex string
+            entropyHex = Buffer.from(randomBytes).toString('hex');
+            console.log(`Generated entropy (crypto): ${entropyHex.substring(0,10)}... Length: ${entropyHex.length}`); // Log entropy info
         } else {
-            console.error("Secure random number generator not available. Falling back to less secure method. DO NOT use this for production keys.");
+            console.warn("Secure random number generator not available. Falling back to less secure method. DO NOT use this for production keys.");
             // Fallback for environments without window.crypto (like older SSR or specific runtimes)
             // WARNING: This fallback using Math.random is NOT cryptographically secure.
             const fallbackRandomBytes = new Uint8Array(ENTROPY_BYTES);
             for (let i = 0; i < ENTROPY_BYTES; i++) {
                 fallbackRandomBytes[i] = Math.floor(Math.random() * 256);
             }
-             // Convert the fallback bytes to a hex string
-            const fallbackEntropyHex = Buffer.from(fallbackRandomBytes).toString('hex');
-            mnemonic = bip39.entropyToMnemonic(fallbackEntropyHex); // Pass the hex string
+            entropyHex = Buffer.from(fallbackRandomBytes).toString('hex');
+            console.log(`Generated entropy (fallback): ${entropyHex.substring(0,10)}... Length: ${entropyHex.length}`); // Log entropy info
+        }
+
+        // Explicitly check entropy length before calling bip39
+        if (entropyHex.length !== ENTROPY_BYTES * 2) {
+             console.error(`Generated entropy hex has incorrect length: ${entropyHex.length}. Expected: ${ENTROPY_BYTES * 2}`);
+             throw new Error("Entropy generation resulted in incorrect length.");
+        }
+
+        try {
+           // Ensure the input is definitely a hex string of the correct length
+           mnemonic = bip39.entropyToMnemonic(entropyHex);
+        } catch (bip39Error) {
+             // Log the specific error from bip39 along with the entropy used
+             console.error("bip39.entropyToMnemonic failed. Entropy Hex:", entropyHex, "Error:", bip39Error);
+             // Re-throw the specific error to propagate it
+             throw bip39Error;
         }
 
         words = mnemonic.split(' ');
 
         // BIP39 word count depends strictly on entropy bits (128->12, 160->15 etc.).
-        // For 128 bits, it should always be 12 words.
+        // For 128 bits, it should always be 12 words. Check this rigorously.
         if (words.length !== 12) {
-             console.error(`Generated mnemonic has unexpected word count: ${words.length}. Expected 12 for 128 bits.`);
+             console.error(`Generated mnemonic has unexpected word count: ${words.length}. Expected 12 for 128 bits. Mnemonic: ${mnemonic}`);
              throw new Error("Mnemonic generation failed: incorrect word count.");
         }
 
     } catch (error) {
-        console.error("Error during mnemonic generation:", error);
-        throw new Error(`Seed phrase generation failed: ${error instanceof Error ? error.message : String(error)}`);
+        // Catch errors from entropy generation or bip39 call
+        console.error("Error during seed phrase generation process:", error);
+        // Provide a clearer error message indicating the failure point
+        throw new Error(`Seed phrase generation failed: ${error instanceof Error ? error.message : String(error)}. Please try again or check console for details.`);
     }
 
 
     // Take the first 5 words
     const fiveWordPhrase = words.slice(0, WORD_COUNT_TARGET).join(' ');
 
-    // Basic check to prevent empty phrase return and ensure correct word count
+    // Final validation of the output phrase
     if (!fiveWordPhrase || fiveWordPhrase.split(' ').length !== WORD_COUNT_TARGET) {
-         console.error("Generated phrase is invalid after slicing. Expected 5 words.");
-         throw new Error("Generated phrase is invalid.");
+         console.error(`Generated phrase is invalid after slicing. Expected ${WORD_COUNT_TARGET} words. Got: "${fiveWordPhrase}"`);
+         throw new Error("Generated phrase is invalid after processing.");
     }
 
     return fiveWordPhrase;
@@ -218,4 +235,23 @@ export function verifySeedPhraseLocally(providedSeedPhrase: string): boolean {
        return storedSeed === providedSeedPhrase.trim();
    }
    return false;
+}
+
+/**
+ * Placeholder for implementing a secure recovery mechanism.
+ * This function needs to be defined based on the chosen recovery strategy.
+ * @param {string} username - The username attempting recovery.
+ * @param {any} recoveryData - Data provided by the user for recovery (e.g., answers to security questions, backup code).
+ * @returns {Promise<string | null>} The recovered seed phrase or null if recovery fails.
+ */
+export async function recoverSeedPhrase(username: string, recoveryData: any): Promise<string | null> {
+    console.warn("Account recovery function is not implemented yet.");
+    // --- TODO: Implement actual recovery logic based on chosen method ---
+    // Example: Check recoveryData against stored hints/backup (if implemented)
+    // This is highly dependent on the recovery strategy chosen earlier.
+    // Since we currently have no server-side or cloud backup,
+    // true recovery is likely impossible with this model.
+    // This function serves as a placeholder.
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate check
+    return null; // Indicate failure as no method is implemented
 }
