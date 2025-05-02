@@ -18,11 +18,20 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { logout as authLogout, getUsername } from '@/lib/auth'; // Import logout and getUsername
 
 
 export default function SettingsPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const [username, setUsername] = React.useState<string | null>(null);
+
+   React.useEffect(() => {
+      // Fetch username on component mount (client-side only)
+      if (typeof window !== 'undefined') {
+         setUsername(getUsername());
+      }
+   }, []);
 
   const handleDownloadData = () => {
     // Placeholder: Implement data download logic
@@ -46,25 +55,23 @@ export default function SettingsPage() {
     // For this demo, we just show a warning.
     toast({
         title: 'Security Critical Action',
-        description: 'Changing your seed phrase is complex and risky. Feature not implemented in this demo.',
+        description: 'Changing your seed phrase is complex and risky. Feature not fully implemented in this demo.',
         variant: 'destructive',
         duration: 5000,
     });
   };
 
   const handleLogout = () => {
-    // Placeholder: Implement logout logic
-    // Clear demo login state from localStorage
-    localStorage.removeItem('thredx_currentUser');
-    localStorage.removeItem('thredx_username');
-    localStorage.removeItem('thredx_seedPhrase');
+    // Use the imported logout function
+    if (typeof window !== 'undefined') {
+       authLogout(); // Clears seed phrase and username
+       toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
 
-    toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
-
-    // Redirect to login page after a short delay to allow toast to be seen
-    setTimeout(() => {
-        router.push('/login');
-    }, 500);
+       // Redirect to login page after a short delay to allow toast to be seen
+       setTimeout(() => {
+           router.push('/login');
+       }, 500);
+    }
   };
 
   return (
@@ -74,7 +81,9 @@ export default function SettingsPage() {
       <Card className="shadow-md border-primary/10">
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="text-xl sm:text-2xl">Account Management</CardTitle>
-          <CardDescription className="text-sm sm:text-base">Manage your account settings and data.</CardDescription>
+          <CardDescription className="text-sm sm:text-base">
+             Logged in as: <span className="font-medium text-foreground">{username || 'Loading...'}</span>
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0">
           <Button onClick={handleDownloadData} variant="outline" className="w-full justify-start border-primary/50 hover:bg-primary/10 h-11 sm:h-10 text-base sm:text-sm">

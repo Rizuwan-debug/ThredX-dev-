@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast'; // Import useToast
 import { Textarea } from '@/components/ui/textarea'; // Import Textarea
 import Image from 'next/image'; // Import next/image
 import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
+import { getUsername } from '@/lib/auth'; // Import getUsername
 
 // Placeholder for Home Feed functionality
 interface Post {
@@ -37,12 +38,26 @@ export default function HomePage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null); // State for username
 
-  // Simulate fetching initial feed data
+  // Fetch username and simulate feed data
   useEffect(() => {
-      const fetchFeed = async () => {
+      let isMounted = true;
+      const fetchData = async () => {
+          // Fetch username (client-side only)
+          if (typeof window !== 'undefined') {
+            const username = getUsername();
+            if (isMounted) {
+                setCurrentUsername(username);
+            }
+          }
+
+          // Simulate fetching initial feed data
           setIsLoadingFeed(true);
           await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
+
+          if (!isMounted) return; // Prevent setting state if unmounted
+
           // Demo data
           const fetchedPosts = [
             { id: 1, username: 'mutual_friend_1', content: 'Just setting up my ThredX!', timestamp: '2 mins ago', image: 'https://picsum.photos/seed/post1/600/400', imageHint: 'abstract background' },
@@ -54,11 +69,16 @@ export default function HomePage() {
           setPosts(fetchedPosts);
           setIsLoadingFeed(false);
       };
-      fetchFeed();
+
+      fetchData();
+
+      return () => {
+        isMounted = false; // Cleanup function to set isMounted to false
+      };
   }, []);
 
 
-  // TODO: Add logic to check if user is authenticated. Redirect if not.
+  // TODO: Add logic to check if user is authenticated via seed phrase. Redirect if not.
 
   const handlePostSubmit = useCallback(async () => {
      const trimmedContent = postContent.trim();
@@ -79,10 +99,19 @@ export default function HomePage() {
         return;
      }
 
+     if (!currentUsername) {
+        toast({
+             variant: "destructive",
+             title: "Error",
+             description: "Username not found. Please log in again.",
+        });
+        return;
+     }
+
      setIsPosting(true);
 
      // Placeholder: Simulate creating a post
-     console.log("Posting content:", trimmedContent, "Image:", imageFile?.name);
+     console.log("Posting content:", trimmedContent, "Image:", imageFile?.name, "by", currentUsername);
      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
 
      // In a real app:
@@ -93,7 +122,7 @@ export default function HomePage() {
      // Add the new post to the state (for demo purposes)
      const newPost: Post = {
         id: Date.now(), // Use timestamp for unique ID in demo
-        username: 'current_user', // Replace with actual username later
+        username: currentUsername, // Use fetched username
         content: trimmedContent,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }), // Simple timestamp
         image: imagePreview || undefined, // Use preview URL for demo
@@ -117,7 +146,7 @@ export default function HomePage() {
         description: `Your post has been added to the feed.`,
      });
 
-  }, [postContent, imageFile, imagePreview, toast]); // Dependencies
+  }, [postContent, imageFile, imagePreview, toast, currentUsername]); // Add currentUsername dependency
 
   const handleAddMediaClick = () => {
       fileInputRef.current?.click(); // Trigger file input click
@@ -190,6 +219,8 @@ export default function HomePage() {
     <div className="max-w-2xl mx-auto space-y-6 pb-10"> {/* Add padding bottom */}
       <div className="flex justify-between items-center mb-6 px-1 sm:px-0">
         <h1 className="text-xl sm:text-2xl font-semibold" id="main-heading">Home Feed</h1>
+        {/* Display Username when available */}
+        {currentUsername && <span className="text-sm text-muted-foreground">Welcome, {currentUsername}</span>}
         <nav aria-label="User actions">
           <div className="flex space-x-2">
             <Link href="/messages" passHref legacyBehavior>
@@ -223,6 +254,7 @@ export default function HomePage() {
                     maxLength={MAX_POST_LENGTH}
                     aria-label="New post content"
                     aria-describedby="char-count"
+                    disabled={!currentUsername} // Disable if username isn't loaded
                 />
                 <p id="char-count" className={`text-xs text-right mt-1 ${charsLeft < 0 ? 'text-destructive' : 'text-muted-foreground'}`} aria-live="polite">
                     {charsLeft} characters remaining
@@ -260,6 +292,7 @@ export default function HomePage() {
                   accept="image/*" // Accept only image files
                   className="hidden"
                   aria-hidden="true"
+                  disabled={!currentUsername} // Disable if username isn't loaded
               />
 
               <div className="flex justify-between items-center mt-3">
@@ -270,6 +303,7 @@ export default function HomePage() {
                      onClick={handleAddMediaClick}
                      className="text-muted-foreground hover:text-foreground p-2"
                      aria-label="Add media to post"
+                     disabled={!currentUsername} // Disable if username isn't loaded
                   >
                       <ImagePlus className="mr-1 sm:mr-2 h-4 w-4" />
                       <span className="hidden sm:inline">Add Media</span>
@@ -279,8 +313,8 @@ export default function HomePage() {
                       className="bg-primary hover:bg-primary/90 text-primary-foreground px-3 py-1.5 sm:px-4 sm:py-2"
                       size="sm"
                       // Removed onClick here, handled by form onSubmit
-                      disabled={isPostButtonDisabled}
-                      aria-disabled={isPostButtonDisabled}
+                      disabled={isPostButtonDisabled || !currentUsername} // Also disable if username isn't loaded
+                      aria-disabled={isPostButtonDisabled || !currentUsername}
                   >
                       {isPosting ? (
                           <Loader2 className="mr-1 sm:mr-2 h-4 w-4 animate-spin" aria-label="Posting..." />

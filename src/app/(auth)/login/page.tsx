@@ -6,26 +6,27 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, User } from 'lucide-react'; // Added User icon
+import { Textarea } from '@/components/ui/textarea'; // Import Textarea
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input'; // Changed import from Textarea to Input
+import { Input } from '@/components/ui/input'; // Keep Input for username
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { verifySeedPhraseLocally, hasStoredSeedPhrase, validateSeedPhrase, storeSeedPhrase } from '@/lib/auth'; // Import necessary auth functions
+import { verifySeedPhraseLocally, hasStoredSeedPhrase, validateSeedPhrase, getUsername, storeUsername } from '@/lib/auth'; // Import necessary auth functions
 import Link from 'next/link';
-import { Textarea } from '@/components/ui/textarea'; // Keep Textarea import if needed elsewhere, but use Input for seed
 
 // Define the validation schema using Zod
 const formSchema = z.object({
+  username: z.string().min(1, "Username is required."), // Simple validation for login
   seedPhrase: z.string()
     .trim()
-    .refine(phrase => phrase.split(' ').filter(word => word.length > 0).length === 12, {
-      message: "Seed phrase must contain exactly 12 words.",
+    .refine(phrase => phrase.split(/\s+/).filter(word => word.length > 0).length === 5, { // Check for 5 words
+      message: "Seed phrase must contain exactly 5 words.",
     })
-    .refine(phrase => validateSeedPhrase(phrase), { // Add validation using bip39
-        message: "Invalid seed phrase format or checksum.",
+    .refine(phrase => validateSeedPhrase(phrase), { // Add validation using our updated function
+        message: "Invalid seed phrase format.",
     }),
 });
 
@@ -34,54 +35,69 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [showSeedPhrase, setShowSeedPhrase] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [rememberedUsername, setRememberedUsername] = useState<string>('');
 
    // Check if user is already logged in on component mount (client-side only)
    useEffect(() => {
      // Ensure this runs only on the client
-     if (typeof window !== 'undefined' && hasStoredSeedPhrase()) {
-       console.log('User already logged in (has seed phrase). Redirecting to home.');
-       router.replace('/home'); // Use replace to avoid adding login to history
+     if (typeof window !== 'undefined') {
+        if (hasStoredSeedPhrase()) {
+             console.log('User already logged in (has seed phrase). Redirecting to home.');
+             router.replace('/home'); // Use replace to avoid adding login to history
+         } else {
+             // Attempt to retrieve stored username
+             const storedUsername = getUsername();
+             if (storedUsername) {
+                 setRememberedUsername(storedUsername);
+                 // Pre-fill the form field
+                 form.setValue('username', storedUsername);
+             }
+         }
      }
+   // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [router]); // Dependency array includes router
 
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      username: '', // Initialize username field
       seedPhrase: '',
     },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    console.log("Attempting login with:", values.seedPhrase.substring(0, 10) + "..."); // Log submitted phrase carefully
+    console.log("Attempting login for user:", values.username, "with phrase:", values.seedPhrase.substring(0, 10) + "..."); // Log submitted data carefully
 
     try {
         // Perform verification (ensure this runs client-side)
         if (typeof window !== 'undefined') {
-            const isValid = verifySeedPhraseLocally(values.seedPhrase); // Use local verification
+            // 1. Verify the seed phrase itself
+            const isSeedValid = verifySeedPhraseLocally(values.seedPhrase);
 
-            if (isValid) {
-                 console.log('Seed phrase verified locally.'); // Keep for debug
+            if (isSeedValid) {
+                 // 2. Check if the entered username matches the stored one (if any)
+                 // In this simple model, we just store/verify the seed. Association with username is implicit.
+                 // If multiple users used the same browser, this wouldn't distinguish them without more complex key derivation.
+                 // For now, successful seed verification means login.
 
-                 // Re-store the seed phrase to ensure it's the active one?
-                 // Or just rely on the fact that it matched the stored one.
-                 // Storing again might be redundant if `verifySeedPhraseLocally` reads from storage.
-                 // Let's assume verification implies it's the correct one for the session.
-                 // If we needed to ensure it *is* in localStorage (e.g., if verify was against a derived key),
-                 // we might store it here: storeSeedPhrase(values.seedPhrase);
+                 console.log('Seed phrase verified locally.');
+
+                 // Store/update the username used for login
+                 storeUsername(values.username);
 
                  toast({
                    title: "Login Successful",
-                   description: "Welcome back!",
+                   description: `Welcome back, ${values.username}!`,
                  });
                  router.push('/home'); // Redirect on successful login
              } else {
-                 console.log('Local seed phrase verification failed.'); // Keep for debug
+                 console.log('Local seed phrase verification failed.');
                  toast({
                    variant: "destructive",
                    title: "Login Failed",
-                   description: "Incorrect seed phrase. Please try again.",
+                   description: "Incorrect username or seed phrase. Please try again.",
                  });
              }
         } else {
@@ -112,8 +128,9 @@ export default function LoginPage() {
         <CardHeader className="text-center p-4 sm:p-6">
            {/* Re-using the SVG Icon */}
            <svg
-              width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-              className="mx-auto mb-2 text-primary h-10 w-10 sm:h-12 sm:w-12" aria-hidden="true"
+              viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+              className="mx-auto mb-2 text-primary h-10 w-10 sm:h-12 sm:w-12" // Use Tailwind for size
+              aria-hidden="true"
            >
                <path d="M21 8L16 3H8L3 8V16L8 21H16L21 16V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                <path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" stroke="currentColor" strokeWidth="2"/>
@@ -129,35 +146,57 @@ export default function LoginPage() {
                <path d="M8 21L6 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
           <CardTitle className="text-2xl sm:text-3xl font-bold text-primary">Welcome Back</CardTitle>
-          <CardDescription className="text-sm sm:text-base">Enter your 12-word recovery phrase to log in.</CardDescription>
+          <CardDescription className="text-sm sm:text-base">Enter your username and 5-word recovery phrase.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-4 sm:p-6">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {/* Username Input */}
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base">Username</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                         <User className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Enter your username"
+                          className="pl-8" // Add padding for icon
+                          {...field}
+                          aria-required="true"
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Seed Phrase Input */}
               <FormField
                 control={form.control}
                 name="seedPhrase"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base">Secret Recovery Phrase</FormLabel>
+                    <FormLabel className="text-base">Secret Recovery Phrase (5 words)</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        {/* Use Textarea for multi-line input */}
+                        {/* Use Textarea for potentially multi-line input during paste */}
                         <Textarea
-                          placeholder="Enter your 12 words separated by spaces..."
-                          className="resize-none pr-10 font-mono" // Add font-mono
+                          placeholder="Enter your 5 words separated by spaces..."
+                          className={`resize-none pr-10 font-mono ${showSeedPhrase ? '' : 'blur-sm'}`} // Use blur for hiding
                           rows={3} // Adjust rows as needed
                           {...field}
-                          // Use type="text" or omit for Textarea, apply show/hide logic if truly needed, but it's less common for textareas
-                          // type={showSeedPhrase ? "text" : "password"} // This doesn't work well with Textarea; remove if causing issues.
-                           aria-required="true" // Mark as required for accessibility
+                           aria-required="true"
                         />
-                        {/* Show/Hide button - Consider if needed for Textarea */}
+                        {/* Show/Hide button */}
                         <Button
                            type="button"
                            variant="ghost"
                            size="icon"
-                           className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" // Adjust positioning for Textarea
+                           className="absolute right-1 top-1 h-7 w-7" // Adjusted position slightly
                            onClick={() => setShowSeedPhrase(!showSeedPhrase)}
                            aria-label={showSeedPhrase ? "Hide seed phrase" : "Show seed phrase"}
                          >
@@ -186,9 +225,9 @@ export default function LoginPage() {
              </p>
             <p className="text-sm text-muted-foreground">
               Forgot your phrase?{' '}
-              <Link href="/recover" passHref>
-                 <span className="font-medium text-primary hover:underline cursor-pointer">
-                   Recover Account
+              <Link href="/no-recovery-info" passHref>
+                 <span className="font-medium text-primary hover:underline cursor-pointer" >
+                   Why no recovery?
                  </span>
                </Link>
             </p>

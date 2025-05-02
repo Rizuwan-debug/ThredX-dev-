@@ -6,21 +6,24 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Eye, EyeOff, Copy, Check, RefreshCw, AlertTriangle } from 'lucide-react'; // Added Check, RefreshCw, AlertTriangle
+import { Eye, EyeOff, Copy, Check, RefreshCw, AlertTriangle, User } from 'lucide-react'; // Added User icon
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form'; // Added FormDescription to import
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'; // Ensure FormDescription is imported if used, it wasn't in the prev version causing error
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Import Alert components
 import { useToast } from '@/hooks/use-toast';
-import { generateSeedPhrase, validateSeedPhrase, storeSeedPhrase, hasStoredSeedPhrase } from '@/lib/auth'; // Import auth functions
+import { generateSeedPhrase, validateSeedPhrase, storeSeedPhrase, hasStoredSeedPhrase, storeUsername } from '@/lib/auth'; // Import auth functions, including storeUsername
 import Link from 'next/link';
 
 // Define the validation schema using Zod
 const formSchema = z.object({
-  // No username or password fields needed for seed phrase generation
-  // We will handle seed phrase generation and display separately
+  username: z.string()
+    .min(3, "Username must be at least 3 characters.")
+    .max(20, "Username must be no more than 20 characters.")
+    .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores."),
+  // Seed phrase handled separately, not part of form validation itself
 });
 
 export default function SignupPage() {
@@ -29,7 +32,7 @@ export default function SignupPage() {
   const [seedPhrase, setSeedPhrase] = useState<string>('');
   const [showSeedPhrase, setShowSeedPhrase] = useState<boolean>(false);
   const [isCopied, setIsCopied] = useState<boolean>(false);
-  const [hasConfirmed, setHasConfirmed] = useState<boolean>(false);
+  const [hasConfirmedSeed, setHasConfirmedSeed] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false); // Loading state for final confirmation
 
   // Check if user is already logged in (has seed phrase) on component mount (client-side only)
@@ -45,11 +48,10 @@ export default function SignupPage() {
    }, [router]); // Add router as a dependency
 
 
-  // Use react-hook-form for structure, though fields aren't directly used here
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      // No default values needed for this form
+      username: '',
     },
   });
 
@@ -61,7 +63,7 @@ export default function SignupPage() {
       setSeedPhrase(newSeed);
       setShowSeedPhrase(false); // Hide new phrase initially
       setIsCopied(false);
-      setHasConfirmed(false); // Reset confirmation on regeneration
+      setHasConfirmedSeed(false); // Reset confirmation on regeneration
       console.log('Generated new seed phrase.'); // Keep for debug
     } else {
       console.warn("Attempted to generate seed phrase on the server.");
@@ -91,8 +93,8 @@ export default function SignupPage() {
     }
   };
 
-  const handleConfirmAndContinue = async () => {
-     if (!hasConfirmed) {
+   const handleConfirmAndContinue = async (values: z.infer<typeof formSchema>) => {
+     if (!hasConfirmedSeed) {
        toast({
          variant: "destructive",
          title: "Confirmation Required",
@@ -113,21 +115,22 @@ export default function SignupPage() {
 
      // Simulate async operation if needed, then store and redirect
      try {
-       // Store the seed phrase (ensure this only runs client-side)
+       // Store the username and seed phrase (ensure this only runs client-side)
         if (typeof window !== 'undefined') {
+           storeUsername(values.username); // Store username
            storeSeedPhrase(seedPhrase);
-           console.log('Seed phrase confirmed and stored.'); // Keep for debugging
+           console.log('Username and seed phrase confirmed and stored.'); // Keep for debugging
 
            toast({
              title: "Account Created!",
-             description: "Welcome to ThredX.",
+             description: `Welcome to ThredX, ${values.username}.`,
            });
            router.push('/home'); // Redirect to home page after successful storage
          } else {
-            throw new Error("Cannot store seed phrase on the server.");
+            throw new Error("Cannot store user data on the server.");
          }
      } catch (error) {
-       console.error("Error storing seed phrase or redirecting:", error);
+       console.error("Error storing user data or redirecting:", error);
        toast({
          variant: "destructive",
          title: "Signup Error",
@@ -146,9 +149,9 @@ export default function SignupPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-secondary/10 to-background p-4">
       <Card className="w-full max-w-md shadow-2xl border-primary/20">
         <CardHeader className="text-center p-4 sm:p-6">
-          {/* Updated SVG Icon with responsive sizing */}
+          {/* Updated SVG Icon using Tailwind classes */}
           <svg
-             width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+             viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
              className="mx-auto mb-2 text-primary h-10 w-10 sm:h-12 sm:w-12" // Use Tailwind for size
              aria-hidden="true"
           >
@@ -173,7 +176,32 @@ export default function SignupPage() {
         </CardHeader>
         <CardContent className="space-y-4 p-4 sm:p-6">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(() => {})} className="space-y-4">
+            {/* Pass onSubmit to the form */}
+            <form onSubmit={form.handleSubmit(handleConfirmAndContinue)} className="space-y-4">
+
+             {/* Username Input */}
+             <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base">Choose a Username</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                         <User className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="e.g., secure_user_123"
+                          className="pl-8" // Add padding for icon
+                          {...field}
+                          aria-required="true"
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
              {/* Seed Phrase Display Area */}
              <FormItem>
                <FormLabel className="text-base font-semibold">Your Secret Recovery Phrase</FormLabel>
@@ -239,12 +267,12 @@ export default function SignupPage() {
              {/* Confirmation Checkbox */}
              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 sm:p-4 shadow-sm bg-secondary/10">
                   <FormControl>
-                      {/* Basic HTML checkbox for simplicity - replace with ShadCN Checkbox if preferred */}
+                      {/* Basic HTML checkbox for simplicity */}
                       <input
                          type="checkbox"
                          id="confirm-save"
-                         checked={hasConfirmed}
-                         onChange={(e) => setHasConfirmed(e.target.checked)}
+                         checked={hasConfirmedSeed}
+                         onChange={(e) => setHasConfirmedSeed(e.target.checked)}
                          className="mt-1 h-4 w-4 rounded border-primary text-primary focus:ring-primary" // Basic styling
                          aria-required="true"
                       />
@@ -253,17 +281,20 @@ export default function SignupPage() {
                     <FormLabel htmlFor="confirm-save" className="font-medium cursor-pointer"> {/* Add cursor-pointer */}
                       I have saved my Secret Recovery Phrase securely.
                     </FormLabel>
-                    <FormDescription>
+                    {/* Use FormDescription here if needed */}
+                    {/* <FormDescription>
                       Understand that losing this phrase means losing access to your account forever.
-                    </FormDescription>
+                    </FormDescription> */}
+                     <p className="text-sm text-muted-foreground"> {/* Using simple <p> tag for description */}
+                       Understand that losing this phrase means losing access to your account forever.
+                     </p>
                   </div>
                 </FormItem>
 
              <Button
-                type="button" // Change type to button, handle logic in onClick
-                onClick={handleConfirmAndContinue}
+                type="submit" // Change type to submit
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                disabled={!hasConfirmed || !seedPhrase || isLoading} // Disable if not confirmed, no phrase, or loading
+                disabled={!hasConfirmedSeed || !seedPhrase || isLoading} // Disable if not confirmed, no phrase, or loading
               >
                  {isLoading ? 'Setting up...' : 'Confirm & Create Account'}
                </Button>
