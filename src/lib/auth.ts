@@ -53,37 +53,33 @@ export function generateSeedPhrase(): string {
         if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
             const randomBytes = new Uint8Array(ENTROPY_BYTES);
             window.crypto.getRandomValues(randomBytes);
-            // Pass Buffer directly to entropyToMnemonic
-            mnemonic = bip39.entropyToMnemonic(Buffer.from(randomBytes));
+            // Convert the Uint8Array to a hex string for bip39
+            const entropyHex = Buffer.from(randomBytes).toString('hex'); // Correct conversion
+            mnemonic = bip39.entropyToMnemonic(entropyHex); // Pass the hex string
         } else {
             console.error("Secure random number generator not available. Falling back to less secure method. DO NOT use this for production keys.");
             // Fallback for environments without window.crypto (like older SSR or specific runtimes)
-            // WARNING: This fallback using Math.random is NOT cryptographically secure and might still cause issues.
+            // WARNING: This fallback using Math.random is NOT cryptographically secure.
             const fallbackRandomBytes = new Uint8Array(ENTROPY_BYTES);
             for (let i = 0; i < ENTROPY_BYTES; i++) {
                 fallbackRandomBytes[i] = Math.floor(Math.random() * 256);
             }
-             // Pass Buffer directly to entropyToMnemonic
-            mnemonic = bip39.entropyToMnemonic(Buffer.from(fallbackRandomBytes));
+             // Convert the fallback bytes to a hex string
+            const fallbackEntropyHex = Buffer.from(fallbackRandomBytes).toString('hex');
+            mnemonic = bip39.entropyToMnemonic(fallbackEntropyHex); // Pass the hex string
         }
 
         words = mnemonic.split(' ');
 
         // BIP39 word count depends strictly on entropy bits (128->12, 160->15 etc.).
-        // Check if we got the expected number of words for the entropy used.
-        const expectedWordCount = bip39.wordlists.english.length * (ENTROPY_BITS / 11); // This isn't quite right, word count is fixed for entropy length
         // For 128 bits, it should always be 12 words.
         if (words.length !== 12) {
              console.error(`Generated mnemonic has unexpected word count: ${words.length}. Expected 12 for 128 bits.`);
-             // Throw an error or retry, as this indicates a problem with bip39 or the entropy.
              throw new Error("Mnemonic generation failed: incorrect word count.");
         }
 
     } catch (error) {
         console.error("Error during mnemonic generation:", error);
-        // Attempt to recover or inform the user
-        // For now, rethrow or return a default/error state might be needed
-        // Rethrowing to make the issue visible
         throw new Error(`Seed phrase generation failed: ${error instanceof Error ? error.message : String(error)}`);
     }
 
@@ -91,11 +87,10 @@ export function generateSeedPhrase(): string {
     // Take the first 5 words
     const fiveWordPhrase = words.slice(0, WORD_COUNT_TARGET).join(' ');
 
-    // Basic check to prevent empty phrase return
-    if (!fiveWordPhrase) {
-         console.error("Generated phrase is empty after slicing. This should not happen.");
-         // Throw an error as this is unexpected
-         throw new Error("Generated phrase is empty.");
+    // Basic check to prevent empty phrase return and ensure correct word count
+    if (!fiveWordPhrase || fiveWordPhrase.split(' ').length !== WORD_COUNT_TARGET) {
+         console.error("Generated phrase is invalid after slicing. Expected 5 words.");
+         throw new Error("Generated phrase is invalid.");
     }
 
     return fiveWordPhrase;
@@ -116,13 +111,15 @@ export function validateSeedPhrase(seedPhrase: string): boolean {
     return false;
   }
   // Optionally, check if words are in the BIP39 english wordlist for better validation
+  // This might be too strict if the generation method isn't guaranteed to use only BIP39 words,
+  // but since we are deriving from a BIP39 mnemonic, this check is reasonable.
   const wordlist = bip39.wordlists.english;
   if (!words.every(word => wordlist.includes(word))) {
-      console.warn("Validation failed: Phrase contains words not in the standard list.");
-      // Consider if this strict check is desired for the 5-word derived phrase
+      console.warn("Validation failed: Phrase contains words not in the standard BIP39 english wordlist.");
+      // Depending on strictness required, you might return false here.
       // return false;
   }
-  return true; // Passes if it has 5 non-empty words
+  return true; // Passes if it has 5 non-empty words (and optionally if they are valid BIP39 words)
 }
 
 /**
