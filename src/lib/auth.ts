@@ -33,18 +33,25 @@ const USERNAME_KEY = 'thredx_username'; // Key for storing username
 
 
 /**
- * Generates a cryptographically secure 5-word seed phrase.
- * Adjusted to generate 5 words (64 bits of entropy needed).
+ * Generates a 5-word seed phrase derived from a standard 12-word BIP39 mnemonic.
+ * Uses 128 bits of entropy (standard minimum) to generate 12 words, then takes the first 5.
  * Uses window.crypto for better randomness in browser environments.
  * IMPORTANT: This should only be called on the client-side.
  * @returns {string} A 5-word seed phrase.
  */
 export function generateSeedPhrase(): string {
-    const WORD_COUNT = 5; // Target 5 words
-    const ENTROPY_BITS = (WORD_COUNT * 11) - (WORD_COUNT * 11 % 32); // Closest multiple of 32 bits for BIP39 (needs 64 bits for 5 words)
-    const ENTROPY_BYTES = ENTROPY_BITS / 8; // 8 bytes for 64 bits
+    const WORD_COUNT_TARGET = 5;
+    const STANDARD_ENTROPY_BITS = 128; // Use standard 128 bits (generates 12 words)
+    const ENTROPY_BYTES = STANDARD_ENTROPY_BITS / 8; // 16 bytes
 
-    if (typeof window === 'undefined' || !window.crypto || !window.crypto.getRandomValues) {
+    let mnemonic: string;
+
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+        const randomBytes = new Uint8Array(ENTROPY_BYTES);
+        window.crypto.getRandomValues(randomBytes);
+        const entropy = Buffer.from(randomBytes).toString('hex');
+        mnemonic = bip39.entropyToMnemonic(entropy); // Generates 12 words
+    } else {
         console.error("Secure random number generator not available. Falling back to less secure method. DO NOT use this for production keys.");
         // Fallback for environments without window.crypto (like older SSR or specific runtimes)
         // WARNING: This fallback using Math.random is NOT cryptographically secure.
@@ -52,76 +59,51 @@ export function generateSeedPhrase(): string {
         for (let i = 0; i < ENTROPY_BYTES; i++) {
             fallbackRandomBytes[i] = Math.floor(Math.random() * 256);
         }
-        // Ensure the generated phrase has exactly 5 words. BIP39 might adjust word count based on entropy, so we handle this.
-        let mnemonic = bip39.entropyToMnemonic(Buffer.from(fallbackRandomBytes).toString('hex'));
-        let words = mnemonic.split(' ');
-        while (words.length < WORD_COUNT) {
-             // If fewer words, generate more entropy and append. This is non-standard but aims for 5 words.
-             const moreBytes = new Uint8Array(ENTROPY_BYTES);
-              for (let i = 0; i < ENTROPY_BYTES; i++) {
-                 moreBytes[i] = Math.floor(Math.random() * 256);
-              }
-             mnemonic = bip39.entropyToMnemonic(Buffer.from(moreBytes).toString('hex'));
-             words = [...words, ...mnemonic.split(' ')].filter((w, i, self) => self.indexOf(w) === i); // Keep unique words
-        }
-        return words.slice(0, WORD_COUNT).join(' ');
+        mnemonic = bip39.entropyToMnemonic(Buffer.from(fallbackRandomBytes).toString('hex')); // Generates 12 words
     }
 
-    const randomBytes = new Uint8Array(ENTROPY_BYTES);
-    window.crypto.getRandomValues(randomBytes);
-    const entropy = Buffer.from(randomBytes).toString('hex');
-    let mnemonic = bip39.entropyToMnemonic(entropy);
-    let words = mnemonic.split(' ');
+    const words = mnemonic.split(' ');
 
-     // BIP39 word count depends strictly on entropy bits (128->12, 160->15 etc.).
-     // 64 bits technically isn't standard BIP39 entropy for word list generation.
-     // We'll enforce 5 words by truncation/padding if needed, but this deviates from strict BIP39.
-     // A better approach might be to use 128 bits (12 words) as the minimum standard.
-     // Forcing 5 words:
-     while (words.length < WORD_COUNT) {
-          // Regenerate if needed (rare case if entropy somehow resulted in fewer)
-          window.crypto.getRandomValues(randomBytes);
-          const newEntropy = Buffer.from(randomBytes).toString('hex');
-          mnemonic = bip39.entropyToMnemonic(newEntropy);
-          words = mnemonic.split(' ');
-     }
+    // Ensure we actually got 12 words (should always happen with 128 bits)
+    if (words.length < WORD_COUNT_TARGET) {
+        // This case is extremely unlikely with 128 bits but handle defensively
+        console.error("Failed to generate sufficient words from entropy. Retrying.");
+        return generateSeedPhrase(); // Retry generation
+    }
 
-     // Ensure uniqueness (very unlikely to have duplicates in short phrases, but good practice)
-     const uniqueWords = Array.from(new Set(words));
-     if (uniqueWords.length < WORD_COUNT) {
-         // Extremely unlikely, but handle by regenerating
-         return generateSeedPhrase();
-     }
+    // Take the first 5 words
+    const fiveWordPhrase = words.slice(0, WORD_COUNT_TARGET).join(' ');
 
+    // Basic check to prevent empty phrase return
+    if (!fiveWordPhrase) {
+         console.error("Generated phrase is empty. Retrying.");
+         return generateSeedPhrase(); // Retry generation
+    }
 
-    // Return exactly 5 words
-    return words.slice(0, WORD_COUNT).join(' ');
+    return fiveWordPhrase;
 }
 
 
 /**
  * Validates a given seed phrase (specifically checks for 5 words).
+ * Does not perform BIP39 checksum validation as the 5-word phrase is derived.
  * @param {string} seedPhrase - The seed phrase to validate.
- * @returns {boolean} True if the seed phrase has 5 words and passes BIP39 check, false otherwise.
+ * @returns {boolean} True if the seed phrase has 5 non-empty words, false otherwise.
  */
 export function validateSeedPhrase(seedPhrase: string): boolean {
   if (!seedPhrase) return false;
-  const words = seedPhrase.trim().split(/\s+/); // Split by whitespace
+  const words = seedPhrase.trim().split(/\s+/).filter(word => word.length > 0); // Split by whitespace and remove empty strings
   if (words.length !== 5) {
     console.warn(`Validation failed: Expected 5 words, got ${words.length}`);
     return false;
   }
-  // Optionally, add more checks like ensuring words are in the BIP39 wordlist
-  // For simplicity here, we rely on the word count and the bip39.validateMnemonic (which might be less strict for non-standard lengths)
-  try {
-    // bip39.validateMnemonic might not strictly enforce length if checksum is okay for a subset?
-    // Let's rely primarily on our word count check for the 5-word requirement.
-    // You could add a check against the BIP39 wordlist here for stronger validation.
-    return bip39.validateMnemonic(seedPhrase); // Use BIP39 validation as a checksum/format check
-  } catch (error) {
-    console.error('Error validating seed phrase:', error);
-    return false;
-  }
+  // Optionally, check if words are in the BIP39 english wordlist for better validation
+  // const wordlist = bip39.wordlists.english;
+  // if (!words.every(word => wordlist.includes(word))) {
+  //     console.warn("Validation failed: Phrase contains words not in the standard list.");
+  //     return false;
+  // }
+  return true; // Passes if it has 5 non-empty words
 }
 
 /**
@@ -130,9 +112,9 @@ export function validateSeedPhrase(seedPhrase: string): boolean {
  * @param {string} seedPhrase - The seed phrase to store.
  */
 export function storeSeedPhrase(seedPhrase: string): void {
-  // Basic validation before storing
+  // Use the updated validation logic
   if (validateSeedPhrase(seedPhrase)) {
-     safeLocalStorage.setItem(SEED_PHRASE_KEY, seedPhrase); // Use safe wrapper
+     safeLocalStorage.setItem(SEED_PHRASE_KEY, seedPhrase.trim()); // Trim before storing
      console.log('Seed phrase stored.'); // Keep for debugging, consider removing for prod
   } else {
      console.error('Attempted to store an invalid seed phrase.');
@@ -148,6 +130,7 @@ export function storeSeedPhrase(seedPhrase: string): void {
  */
 export function getSeedPhrase(): string | null {
   const storedSeed = safeLocalStorage.getItem(SEED_PHRASE_KEY); // Use safe wrapper
+  // Use the updated validation logic
   if (storedSeed && validateSeedPhrase(storedSeed)) {
       return storedSeed;
   }
@@ -165,7 +148,8 @@ export function getSeedPhrase(): string | null {
  * @returns {boolean} True if a valid seed phrase is stored, false otherwise.
  */
 export function hasStoredSeedPhrase(): boolean {
-    return !!getSeedPhrase(); // Relies on getSeedPhrase's validation logic
+    // Relies on getSeedPhrase's updated validation logic
+    return !!getSeedPhrase();
 }
 
 
@@ -205,14 +189,17 @@ export function logout(): void {
 /**
  * Verifies a provided seed phrase against the one stored in localStorage.
  * IMPORTANT: This should only be called on the client-side.
+ * Performs simple string comparison after basic validation.
  * @param {string} providedSeedPhrase - The seed phrase provided by the user.
- * @returns {boolean} True if the provided phrase matches the stored one and both are valid, false otherwise.
+ * @returns {boolean} True if the provided phrase matches the stored one and both are valid (5 words), false otherwise.
  */
 export function verifySeedPhraseLocally(providedSeedPhrase: string): boolean {
-   const storedSeed = getSeedPhrase(); // Already validates the stored seed
-   // Validate the provided seed phrase as well
+   const storedSeed = getSeedPhrase(); // Already validates the stored seed structure (5 words)
+
+   // Validate the provided seed phrase structure (5 words)
    if (storedSeed && validateSeedPhrase(providedSeedPhrase)) {
-       return storedSeed === providedSeedPhrase;
+       // Simple string comparison is sufficient now
+       return storedSeed === providedSeedPhrase.trim();
    }
    return false;
 }
