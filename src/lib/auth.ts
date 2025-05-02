@@ -4,6 +4,12 @@
 import * as bip39 from 'bip39';
 import { Buffer } from 'buffer'; // Ensure Buffer is imported explicitly
 
+// Helper function to convert Uint8Array to Hex String manually
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+
 // Function to safely access localStorage
 const safeLocalStorage = {
   getItem: (key: string): string | null => {
@@ -48,13 +54,13 @@ export function generateSeedPhrase(): string {
 
     let mnemonic: string;
     let words: string[];
+    let entropyHex: string; // Define entropyHex here
 
     try {
-        let entropyHex: string;
         if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
             const randomBytes = new Uint8Array(ENTROPY_BYTES);
             window.crypto.getRandomValues(randomBytes);
-            entropyHex = Buffer.from(randomBytes).toString('hex');
+            entropyHex = bytesToHex(randomBytes); // Use manual conversion
             console.log(`Generated entropy (crypto): ${entropyHex.substring(0,10)}... Length: ${entropyHex.length}`); // Log entropy info
         } else {
             console.warn("Secure random number generator not available. Falling back to less secure method. DO NOT use this for production keys.");
@@ -64,7 +70,7 @@ export function generateSeedPhrase(): string {
             for (let i = 0; i < ENTROPY_BYTES; i++) {
                 fallbackRandomBytes[i] = Math.floor(Math.random() * 256);
             }
-            entropyHex = Buffer.from(fallbackRandomBytes).toString('hex');
+            entropyHex = bytesToHex(fallbackRandomBytes); // Use manual conversion
             console.log(`Generated entropy (fallback): ${entropyHex.substring(0,10)}... Length: ${entropyHex.length}`); // Log entropy info
         }
 
@@ -76,7 +82,7 @@ export function generateSeedPhrase(): string {
 
         try {
            // Ensure the input is definitely a hex string of the correct length
-           mnemonic = bip39.entropyToMnemonic(entropyHex);
+           mnemonic = bip39.entropyToMnemonic(entropyHex); // Use entropyHex here
         } catch (bip39Error) {
              // Log the specific error from bip39 along with the entropy used
              console.error("bip39.entropyToMnemonic failed. Entropy Hex:", entropyHex, "Error:", bip39Error);
@@ -236,6 +242,7 @@ export function verifySeedPhraseLocally(providedSeedPhrase: string): boolean {
    }
    return false;
 }
+
 
 /**
  * Placeholder for implementing a secure recovery mechanism.
