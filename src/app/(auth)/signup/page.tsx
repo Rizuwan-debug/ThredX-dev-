@@ -1,332 +1,286 @@
 
-"use client";
+'use client'; // Essential for using hooks like useState, useEffect
 
-import { useState, useEffect } from "react"; // Added useEffect
-import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { Buffer } from 'buffer'; // Import Buffer
-import * as bip39 from 'bip39'; // Import bip39
+import React, { useState, useEffect, useCallback } from 'react'; // Import useEffect and useCallback
+import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Eye, EyeOff, Copy, Check, RefreshCw, AlertTriangle } from 'lucide-react'; // Added Check, RefreshCw, AlertTriangle
 
-import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertTriangle, Copy, RefreshCw } from "lucide-react"; // Added RefreshCw
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form'; // Added FormDescription to import
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Import Alert components
+import { useToast } from '@/hooks/use-toast';
+import { generateSeedPhrase, validateSeedPhrase, storeSeedPhrase, hasStoredSeedPhrase } from '@/lib/auth'; // Import auth functions
 import Link from 'next/link';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Added Alert components
 
-// Ensure Buffer is available globally for bip39 on the client
-if (typeof window !== 'undefined') {
-  window.Buffer = window.Buffer || Buffer;
-}
-
-
-// Function to generate 5 unique random words securely using BIP39 standard wordlist
-// This function should only be called client-side.
-const generateSeedPhrase = (): string => {
-    try {
-        // Generate a 128-bit entropy (results in 12 words)
-        const mnemonic = bip39.generateMnemonic(128); // Standard BIP39 generation
-        const words = mnemonic.split(' ');
-
-        // Select 5 unique words randomly from the generated 12
-        const selectedWords = new Set<string>();
-        const availableWords = [...words]; // Clone array for manipulation
-
-        while (selectedWords.size < 5 && availableWords.length > 0) {
-            const randomIndex = Math.floor(Math.random() * availableWords.length);
-            selectedWords.add(availableWords.splice(randomIndex, 1)[0]); // Remove the word after selection
-        }
-
-        // This check is highly unlikely to fail with 12 unique words, but good practice
-        if (selectedWords.size !== 5) {
-          console.error("Could not generate 5 unique words from 12, something is wrong.");
-          // Fallback: Just take the first 5 words (less random but ensures 5 words)
-           return words.slice(0, 5).join(' ');
-        }
-
-        return Array.from(selectedWords).join(' '); // Return 5 unique words separated by space
-
-    } catch (error) {
-        console.error("Error generating BIP39 mnemonic:", error);
-        // Rethrow or handle more gracefully, maybe show an error to the user
-         throw new Error("Failed to generate secure seed phrase. Please try refreshing.");
-    }
-};
-
-
-// Placeholder for user creation - Runs client-side due to localStorage access
-const createUser = async (username: string, seedPhrase: string): Promise<{ success: boolean; message: string }> => {
-  console.log("Creating user (DEMO):", username);
-  // WARNING: In a real application:
-  // 1. DO NOT log the seed phrase.
-  // 2. Use the seed phrase (possibly with a user password as salt/pepper)
-  //    to generate cryptographic keys (e.g., using PBKDF2 or Argon2).
-  // 3. Store a HASH of a derived key or password, NEVER the seed phrase itself.
-  // 4. The seed phrase is for the *user* to keep, not for the server to store plaintext.
-  await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-
-  // Simulate checking if username exists (replace with actual backend check)
-  if (localStorage.getItem('thredx_username') === username) { // Simple check for demo
-      return { success: false, message: 'Username already taken (Demo check).' };
-  }
-
-  // **DEMO ONLY**: Store username and seed phrase in localStorage.
-  // **NEVER DO THIS IN PRODUCTION!** Seed phrases should *never* be stored by the application.
-  localStorage.setItem('thredx_username', username);
-  localStorage.setItem('thredx_seedPhrase', seedPhrase); // VERY INSECURE - FOR DEMO ONLY
-  console.log("Demo user data stored in localStorage.");
-
-  return { success: true, message: 'Account created successfully! (Demo Mode)' };
-};
-
-// Username validation
+// Define the validation schema using Zod
 const formSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters.").max(20, "Username cannot exceed 20 characters."),
-  // Seed phrase is handled separately, not part of direct form input validation here
+  // No username or password fields needed for seed phrase generation
+  // We will handle seed phrase generation and display separately
 });
-
-type SignupFormValues = z.infer<typeof formSchema>;
 
 export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [generatedSeedPhrase, setGeneratedSeedPhrase] = useState<string | null>(null);
-  const [isClient, setIsClient] = useState(false); // Track client-side mount
+  const [seedPhrase, setSeedPhrase] = useState<string>('');
+  const [showSeedPhrase, setShowSeedPhrase] = useState<boolean>(false);
+  const [isCopied, setIsCopied] = useState<boolean>(false);
+  const [hasConfirmed, setHasConfirmed] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false); // Loading state for final confirmation
 
-  useEffect(() => {
-    // Set isClient to true once the component mounts on the client
-    setIsClient(true);
-    // Optionally, pre-generate seed phrase on mount if desired
-    // handleGenerateSeed();
-  }, []);
+  // Check if user is already logged in (has seed phrase) on component mount (client-side only)
+   useEffect(() => {
+     if (typeof window !== 'undefined' && hasStoredSeedPhrase()) {
+       console.log('User already has a seed phrase stored. Redirecting to home.');
+       router.replace('/home'); // Use replace to avoid adding signup to history
+     } else {
+       // Generate seed phrase only if none exists (client-side)
+       handleGenerateSeedPhrase();
+     }
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [router]); // Add router as a dependency
 
 
-  const form = useForm<SignupFormValues>({
+  // Use react-hook-form for structure, though fields aren't directly used here
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      username: "",
+      // No default values needed for this form
     },
   });
 
-  const handleGenerateSeed = () => {
-    if (!isClient) return; // Ensure this runs only client-side
-
-    setIsLoading(true); // Indicate loading state
-    setGeneratedSeedPhrase(null); // Clear previous seed first
-    try {
-      const seed = generateSeedPhrase(); // Generate new seed
-      setGeneratedSeedPhrase(seed);
-      toast({
-        title: "Seed Phrase Generated - IMPORTANT!",
-        description: "Copy and save these 5 words securely OFFLINE. This is the ONLY way to log in.",
-        variant: "default",
-        duration: 15000, // Long duration for user to read
-      });
-    } catch (error) {
-      console.error("Seed generation failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Error Generating Seed",
-        description: (error as Error).message || "Failed to generate seed phrase. Please try again.",
-      });
-    } finally {
-      setIsLoading(false); // Finish loading state
+  // Function to generate a new seed phrase (client-side safe)
+  const handleGenerateSeedPhrase = useCallback(() => {
+    // Ensure this runs client-side where window.crypto is available
+    if (typeof window !== 'undefined') {
+      const newSeed = generateSeedPhrase();
+      setSeedPhrase(newSeed);
+      setShowSeedPhrase(false); // Hide new phrase initially
+      setIsCopied(false);
+      setHasConfirmed(false); // Reset confirmation on regeneration
+      console.log('Generated new seed phrase.'); // Keep for debug
+    } else {
+      console.warn("Attempted to generate seed phrase on the server.");
     }
-  };
+  }, []); // No dependencies needed
 
-  const handleCopySeed = () => {
-    if (generatedSeedPhrase && navigator.clipboard) {
-      navigator.clipboard.writeText(generatedSeedPhrase)
+  const handleCopySeedPhrase = () => {
+    if (typeof window !== 'undefined' && seedPhrase) { // Check window existence
+      navigator.clipboard.writeText(seedPhrase)
         .then(() => {
-          toast({ title: 'Copied!', description: 'Seed phrase copied. Save it securely offline now!' });
+          setIsCopied(true);
+          toast({
+            title: "Copied!",
+            description: "Seed phrase copied to clipboard.",
+          });
+          // Reset icon after a short delay
+          setTimeout(() => setIsCopied(false), 2000);
         })
         .catch(err => {
           console.error('Failed to copy seed phrase: ', err);
-          toast({ variant: 'destructive', title: 'Copy Failed', description: 'Could not copy seed phrase. Please copy manually.' });
+          toast({
+            variant: "destructive",
+            title: "Copy Failed",
+            description: "Could not copy seed phrase. Please copy it manually.",
+          });
         });
-    } else if (!navigator.clipboard) {
-         toast({ variant: 'warning', title: 'Copy Unavailable', description: 'Clipboard API not available. Please copy manually.' });
     }
   };
 
-  const onSubmit = async (values: SignupFormValues) => {
-    if (!isClient) return; // Prevent submission during SSR
-
-    if (!generatedSeedPhrase) {
-        toast({
-            variant: "destructive",
-            title: "Seed Phrase Required",
-            description: "Please generate and save your 5-word seed phrase before signing up.",
-        });
-        return;
-    }
-
-    setIsLoading(true);
-    try {
-      // Call client-side createUser function
-      const result = await createUser(values.username, generatedSeedPhrase);
-      if (result.success) {
-        toast({
-          title: "Signup Successful",
-          description: "Remember to keep your seed phrase safe! Redirecting to login...",
-        });
-        // Clear sensitive demo data from state after signup (optional)
-        // setGeneratedSeedPhrase(null);
-        router.push("/login");
-      } else {
-         toast({
-            variant: "destructive",
-            title: "Signup Failed",
-            description: result.message || "Could not create account. Please try again.",
-         });
-      }
-    } catch (error) {
-       console.error("Signup submission error:", error);
+  const handleConfirmAndContinue = async () => {
+     if (!hasConfirmed) {
        toast({
-        variant: "destructive",
-        title: "Signup Error",
-        description: "An unexpected error occurred during signup. Please try again.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+         variant: "destructive",
+         title: "Confirmation Required",
+         description: "Please confirm you have saved your seed phrase securely.",
+       });
+       return;
+     }
+     if (!seedPhrase || !validateSeedPhrase(seedPhrase)) {
+       toast({
+         variant: "destructive",
+         title: "Invalid Seed Phrase",
+         description: "Cannot continue with an invalid seed phrase. Please regenerate.",
+       });
+       return;
+     }
+
+     setIsLoading(true); // Start loading
+
+     // Simulate async operation if needed, then store and redirect
+     try {
+       // Store the seed phrase (ensure this only runs client-side)
+        if (typeof window !== 'undefined') {
+           storeSeedPhrase(seedPhrase);
+           console.log('Seed phrase confirmed and stored.'); // Keep for debugging
+
+           toast({
+             title: "Account Created!",
+             description: "Welcome to ThredX.",
+           });
+           router.push('/home'); // Redirect to home page after successful storage
+         } else {
+            throw new Error("Cannot store seed phrase on the server.");
+         }
+     } catch (error) {
+       console.error("Error storing seed phrase or redirecting:", error);
+       toast({
+         variant: "destructive",
+         title: "Signup Error",
+         description: "Could not save your account. Please try again.",
+       });
+       setIsLoading(false); // Stop loading on error
+     }
+     // No finally block needed to set isLoading to false, as redirection occurs on success
+   };
+
+  // Prevent rendering form content on the server if seed phrase depends on client-side generation
+  // Or alternatively, ensure generateSeedPhrase can run safely on server (might need crypto polyfill)
+  // For now, we rely on useEffect to generate it client-side.
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-background to-secondary/20"
-    >
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-secondary/10 to-background p-4">
       <Card className="w-full max-w-md shadow-2xl border-primary/20">
         <CardHeader className="text-center p-4 sm:p-6">
-          {/* SVG Icon */}
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto mb-2 text-primary h-10 w-10 sm:h-12 sm:w-12" aria-hidden="true">
-             <path d="M21 8L16 3H8L3 8V16L8 21H16L21 16V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-             <path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" stroke="currentColor" strokeWidth="2"/>
-             {/* Decorative paths simplified */}
-             <path d="M12 3V6 M12 18V21 M21 8H18 M6 8H3 M18 16H21 M3 16H6 M16 3L18 5 M8 3L6 5 M16 21L18 19 M8 21L6 19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
+          {/* Updated SVG Icon with responsive sizing */}
+          <svg
+             width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+             className="mx-auto mb-2 text-primary h-10 w-10 sm:h-12 sm:w-12" // Use Tailwind for size
+             aria-hidden="true"
+          >
+              <path d="M21 8L16 3H8L3 8V16L8 21H16L21 16V8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              {/* Central circle representing core/node */}
+               <path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" stroke="currentColor" strokeWidth="2"/>
+              {/* Radiating lines representing connections/threads */}
+              <path d="M12 3V6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M12 18V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M21 8H18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M6 8H3" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M18 16H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M3 16H6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              {/* Diagonal lines for complexity */}
+              <path d="M16 3L18 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M8 3L6 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M16 21L18 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M8 21L6 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+           </svg>
           <CardTitle className="text-2xl sm:text-3xl font-bold text-primary">ThredX</CardTitle>
           <CardDescription className="text-sm sm:text-base">Create your secure account. Your Privacy, Our Priority.</CardDescription>
         </CardHeader>
-        <CardContent className="p-4 sm:p-6">
+        <CardContent className="space-y-4 p-4 sm:p-6">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 sm:space-y-6">
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Username</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Choose a unique username" {...field} className="bg-secondary/30 border-primary/30 focus:ring-primary/50 h-11 sm:h-10" aria-required="true" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-               <FormItem>
-                 <FormLabel>Your Unique 5-Word Seed Phrase</FormLabel>
-                 <div className="flex flex-col sm:flex-row gap-2 items-center">
-                    <div className="relative flex-grow w-full p-3 bg-muted rounded-md border border-primary/30 group min-h-[60px] flex items-center justify-center">
-                        {isLoading && !generatedSeedPhrase ? (
-                             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                        ) : generatedSeedPhrase ? (
-                             <p className="text-base sm:text-lg font-semibold tracking-wider text-center text-foreground/90 break-words" aria-live="polite">
-                                {generatedSeedPhrase}
-                             </p>
-                        ) : (
-                            <span className="text-sm text-muted-foreground">Click "Generate"</span>
-                        )}
-                        {generatedSeedPhrase && (
-                             <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="absolute top-1 right-1 h-7 w-7 opacity-50 group-hover:opacity-100 transition-opacity"
-                                onClick={handleCopySeed}
-                                aria-label="Copy seed phrase"
-                             >
-                                <Copy className="h-4 w-4" />
-                             </Button>
-                        )}
-                    </div>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleGenerateSeed}
-                        disabled={!isClient || isLoading} // Disable if not client or loading
-                        className="w-full sm:w-auto border-primary/50 hover:bg-primary/10 h-11 sm:h-10 text-base sm:text-sm flex-shrink-0 px-3"
-                        aria-label={generatedSeedPhrase ? "Regenerate seed phrase" : "Generate seed phrase"}
-                    >
-                        <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                        <span className="ml-2">{generatedSeedPhrase ? "Regenerate" : "Generate"}</span>
-                    </Button>
+            <form onSubmit={form.handleSubmit(() => {})} className="space-y-4">
+             {/* Seed Phrase Display Area */}
+             <FormItem>
+               <FormLabel className="text-base font-semibold">Your Secret Recovery Phrase</FormLabel>
+                <Alert variant="warning" className="border-yellow-500/50 dark:border-yellow-400/40">
+                    <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                    <AlertTitle className="font-semibold text-yellow-700 dark:text-yellow-300">Save this phrase securely!</AlertTitle>
+                    <AlertDescription className="text-yellow-700 dark:text-yellow-400">
+                       This is the ONLY way to recover your account. Keep it offline and safe. Never share it.
+                    </AlertDescription>
+                 </Alert>
+               <FormControl>
+                 <div className="relative rounded-md border border-input bg-secondary/30 p-3 font-mono text-sm sm:text-base break-words min-h-[100px] flex items-center justify-center">
+                    {seedPhrase ? (
+                       showSeedPhrase ? (
+                         <span>{seedPhrase}</span>
+                       ) : (
+                         <span className="italic text-muted-foreground">Click the eye icon to reveal</span>
+                       )
+                    ) : (
+                       <span className="italic text-muted-foreground">Generating...</span>
+                    )}
                  </div>
+               </FormControl>
+                <div className="flex items-center justify-between mt-2 space-x-2">
+                   <Button
+                       type="button"
+                       variant="ghost"
+                       size="icon"
+                       onClick={() => setShowSeedPhrase(!showSeedPhrase)}
+                       disabled={!seedPhrase}
+                       aria-label={showSeedPhrase ? "Hide seed phrase" : "Show seed phrase"}
+                     >
+                       {showSeedPhrase ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                     </Button>
+                     <div className="flex space-x-2">
+                         <Button
+                             type="button"
+                             variant="outline"
+                             size="sm"
+                             onClick={handleGenerateSeedPhrase}
+                             className="gap-1.5"
+                             aria-label="Regenerate seed phrase"
+                         >
+                              <RefreshCw className="h-4 w-4" /> Regenerate
+                          </Button>
+                         <Button
+                             type="button"
+                             variant="outline"
+                             size="sm"
+                             onClick={handleCopySeedPhrase}
+                             disabled={!seedPhrase}
+                             className="gap-1.5"
+                             aria-label="Copy seed phrase"
+                         >
+                           {isCopied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                           {isCopied ? 'Copied' : 'Copy'}
+                         </Button>
+                     </div>
+                  </div>
+               <FormMessage /> {/* For potential future errors */}
+             </FormItem>
 
-                 {/* Display the warning only after generation */}
-                 {generatedSeedPhrase && (
-                    <div className="mt-3 space-y-2">
-                        <Alert variant="destructive" className="p-3 sm:p-4">
-                           <AlertTriangle className="h-4 w-4" />
-                           <AlertTitle className="text-sm sm:text-base font-bold">EXTREMELY IMPORTANT</AlertTitle>
-                           <AlertDescription className="text-xs sm:text-sm">
-                             <strong>Save this 5-word seed phrase securely OFFLINE immediately.</strong> This is the ONLY way to access your account.
-                             <br />
-                             <strong>If you lose this phrase, YOUR ACCOUNT CANNOT BE RECOVERED.</strong> We do not store it and cannot help you regain access.
-                             <br />
-                             Treat it like your most valuable physical key. Do not share it with anyone.
-                           </AlertDescription>
-                       </Alert>
-                    </div>
-                 )}
-                 {/* FormMessage can be used if needed, but seed isn't directly validated here */}
-                 {/* <FormMessage /> */}
-               </FormItem>
+             {/* Confirmation Checkbox */}
+             <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 sm:p-4 shadow-sm bg-secondary/10">
+                  <FormControl>
+                      {/* Basic HTML checkbox for simplicity - replace with ShadCN Checkbox if preferred */}
+                      <input
+                         type="checkbox"
+                         id="confirm-save"
+                         checked={hasConfirmed}
+                         onChange={(e) => setHasConfirmed(e.target.checked)}
+                         className="mt-1 h-4 w-4 rounded border-primary text-primary focus:ring-primary" // Basic styling
+                         aria-required="true"
+                      />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel htmlFor="confirm-save" className="font-medium cursor-pointer"> {/* Add cursor-pointer */}
+                      I have saved my Secret Recovery Phrase securely.
+                    </FormLabel>
+                    <FormDescription>
+                      Understand that losing this phrase means losing access to your account forever.
+                    </FormDescription>
+                  </div>
+                </FormItem>
 
-
-              <Button
-                type="submit"
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-11 sm:h-10 text-base sm:text-sm"
-                // Disable submit until seed is generated and not loading, and client-side
-                disabled={!isClient || isLoading || !generatedSeedPhrase}
-               >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Sign Up
-              </Button>
+             <Button
+                type="button" // Change type to button, handle logic in onClick
+                onClick={handleConfirmAndContinue}
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                disabled={!hasConfirmed || !seedPhrase || isLoading} // Disable if not confirmed, no phrase, or loading
+              >
+                 {isLoading ? 'Setting up...' : 'Confirm & Create Account'}
+               </Button>
             </form>
           </Form>
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            Already have an account?{' '}
-            <Link href="/login" className="font-medium text-primary hover:underline">
-              Login
-            </Link>
-          </p>
-           {/* Link to information about why there's no recovery */}
-           <p className="mt-4 text-center text-xs text-muted-foreground">
-             Why no account recovery?{' '}
-             <Link href="/no-recovery-info" className="underline hover:text-primary">
-               Learn more
-             </Link>
-           </p>
         </CardContent>
+        <CardFooter className="flex justify-center p-4 sm:p-6 border-t border-primary/10">
+           <p className="text-sm text-muted-foreground">
+              Already have an account?{' '}
+              <Link href="/login" passHref>
+                <span className="font-medium text-primary hover:underline cursor-pointer">
+                  Log In
+                </span>
+              </Link>
+            </p>
+        </CardFooter>
       </Card>
-    </motion.div>
+    </div>
   );
 }
