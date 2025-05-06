@@ -90,6 +90,8 @@ export default function MessagesPage() {
   const messageEndRef = useRef<HTMLDivElement>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null); // Ref for chat area scrolling
   const optimisticIdCounter = useRef(0); // Use ref for counter to avoid re-renders
+  const [contentHeight, setContentHeight] = useState(0); // Track content height
+  const [containerHeight, setContainerHeight] = useState(0); // Track container height
 
   // Derived state for selected conversation details
   const selectedConversation = useMemo(() =>
@@ -136,6 +138,29 @@ export default function MessagesPage() {
       }
   }, [selectedConversationId, scrollToBottom]); // Dependency on ID and scroll function
 
+    // Effect to measure content and container heights
+    useEffect(() => {
+        const measureHeights = () => {
+            if (chatAreaRef.current) {
+                setContentHeight(chatAreaRef.current.scrollHeight);
+                setContainerHeight(chatAreaRef.current.clientHeight);
+            }
+        };
+
+        // Initial measurement
+        measureHeights();
+
+        // Observe changes to the chat area (e.g., new messages)
+        const observer = new ResizeObserver(measureHeights);
+        if (chatAreaRef.current) {
+            observer.observe(chatAreaRef.current);
+        }
+
+        return () => {
+            observer.disconnect();
+        };
+    }, [messages]); // Re-measure when messages change
+
 
   const handleSendMessage = useCallback(() => {
     const trimmedMessage = messageInput.trim();
@@ -149,11 +174,12 @@ export default function MessagesPage() {
     const optimisticId = `optimistic-${optimisticIdCounter.current++}`;
 
     // Optimistic update
+     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const newMessage: Message = {
         id: optimisticId, // Use unique optimistic ID
         sender: 'You',
         text: trimmedMessage, // Display original text optimistically
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: timestamp,
         isOwn: true,
     };
 
@@ -350,7 +376,7 @@ export default function MessagesPage() {
                     {selectedConversation.username.includes('group') && <Users className="absolute bottom-0 right-0 h-3 w-3 text-background/70 bg-foreground/50 rounded-full p-0.5" aria-label="Group chat" />}
                     {selectedConversation.username.includes('bot') && <svg className="absolute bottom-0 right-0 h-3 w-3 text-background/70 bg-foreground/50 rounded-full p-0.5" viewBox="0 0 24 24" fill="currentColor" aria-label="Bot"><path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-4 0V4a2 2 0 0 1 2-2zM8 11a4 4 0 1 0 8 0H8zm8 0a4 4 0 0 0-8 0v3a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-3zM5 18a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v1a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-1z"/></svg>}
                </div>
-               <div>
+                <div>
                   <h2 className="text-base sm:text-lg font-semibold">{selectedConversation.username}</h2>
                    {/* Status Text */}
                    {selectedConversation.isOnline ? (
@@ -358,7 +384,7 @@ export default function MessagesPage() {
                    ) : (
                         <p className="text-xs text-muted-foreground">Offline</p>
                    )}
-               </div>
+                </div>
             </header>
 
             {/* Message Area Wrapper - uses flex-1 to take remaining vertical space */}
@@ -367,7 +393,10 @@ export default function MessagesPage() {
                     <MessageAreaSkeleton />
                 ) : (
                   // Scrollable Message List - takes available space within the wrapper
-                  <div ref={chatAreaRef} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 bg-secondary/10">
+                  <div ref={chatAreaRef} className={cn(
+                    "flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 bg-secondary/10",
+                    contentHeight < containerHeight ? "mt-0" : "mt-auto"  // Prevent top margin if content is shorter
+                  )}>
                     {messages.length === 0 ? (
                       <div className="text-center text-muted-foreground py-10">No messages yet. Start the conversation!</div>
                     ) : (
