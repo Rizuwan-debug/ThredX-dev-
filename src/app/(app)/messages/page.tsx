@@ -166,7 +166,7 @@ export default function MessagesPage() {
     // For demo, we add it here but would ideally replace the optimistic message later
     const messageForStorage = {
       ...newMessage,
-      id: Date.now(), // In a real app, use the ID from the backend response
+      id: Date.now() + Math.random(), // Use a potentially more unique ID for demo storage
       text: encryptedText
     };
      if (!allMessages[selectedConversation.id]) {
@@ -235,7 +235,8 @@ export default function MessagesPage() {
 
    // Skeleton loader for messages area
    const MessageAreaSkeleton = () => (
-    <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 bg-secondary/10 flex flex-col justify-end">
+    // Added more padding and spacing
+    <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-secondary/10 flex flex-col justify-end">
         {/* Simulate messages loading from bottom up */}
         <div className="flex justify-start mt-auto"> <Skeleton className="h-8 w-1/3 rounded-lg" /> </div>
         <div className="flex justify-end"> <Skeleton className="h-16 w-3/4 rounded-lg" /> </div>
@@ -245,13 +246,9 @@ export default function MessagesPage() {
     </div>
    );
 
-  // Calculate height dynamically using CSS variables, providing fallbacks
-  // Using fixed height to avoid layout shifts during loading or dynamic content changes
-  const chatContainerHeight = "h-[calc(100vh-10rem)]"; // Example: Adjust 10rem based on header/footer/padding
-
+  // Use flex-1 for the container to take available height instead of calc()
   return (
-    // Use a more specific height calculation or a fixed height approach
-    <div className={cn("flex overflow-hidden border border-primary/10 rounded-lg shadow-lg", chatContainerHeight)}>
+    <div className="flex flex-1 overflow-hidden border border-primary/10 rounded-lg shadow-lg">
       {/* Conversation List Sidebar */}
       <aside
         className={cn(
@@ -261,18 +258,19 @@ export default function MessagesPage() {
         )}
         aria-label="Conversations List"
       >
-         <div className="p-3 sm:p-4 border-b border-primary/10 flex items-center justify-between flex-shrink-0">
+         <div className="p-4 sm:p-6 border-b border-primary/10 flex items-center justify-between flex-shrink-0"> {/* Increased padding */}
             <h2 className="text-lg sm:text-xl font-semibold" id="chat-list-heading">Chats</h2>
             <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(false)} aria-label="Close conversations list">
                 <PanelLeftOpen className="h-5 w-5" />
             </Button>
          </div>
+         {/* Increased padding in conversation items */}
          <div className="flex-1 overflow-y-auto" role="navigation" aria-labelledby="chat-list-heading">
              {conversations.map((convo) => (
                <div
                  key={convo.id} // Use stable ID from data
                  className={cn(
-                     `p-3 sm:p-4 flex items-center space-x-2 sm:space-x-3 cursor-pointer hover:bg-secondary/30 transition-colors duration-150 border-b border-primary/5 last:border-b-0 relative`, // Added relative positioning
+                     `p-4 sm:p-5 flex items-center space-x-3 sm:space-x-4 cursor-pointer hover:bg-secondary/30 transition-colors duration-150 border-b border-primary/5 last:border-b-0 relative`, // Increased padding and spacing
                      selectedConversationId === convo.id ? 'bg-primary/10' : '',
                  )}
                  onClick={() => selectConversation(convo.id)}
@@ -284,13 +282,13 @@ export default function MessagesPage() {
                >
                   {/* Avatar Container */}
                   <div className="relative flex-shrink-0">
-                     <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-tr from-primary to-secondary flex items-center justify-center text-primary-foreground font-semibold text-sm sm:text-base" aria-hidden="true">
+                     <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-gradient-to-tr from-primary to-secondary flex items-center justify-center text-primary-foreground font-semibold text-sm sm:text-base" aria-hidden="true"> {/* Slightly larger avatar */}
                          {convo.avatarInitial}
                      </div>
                      {/* Activation Mark (Online Status) */}
                      {convo.isOnline && (
                          <span
-                             className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-sky-400 ring-2 ring-background"
+                             className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-sky-400 ring-2 ring-background" // Larger indicator
                              aria-label="Online"
                              title="Online"
                           />
@@ -327,20 +325,20 @@ export default function MessagesPage() {
         {selectedConversation ? (
           <>
             {/* Chat Header */}
-            <header className="p-3 sm:p-4 border-b border-primary/10 flex items-center space-x-2 sm:space-x-3 flex-shrink-0 bg-background z-10">
+            <header className="p-4 sm:p-6 border-b border-primary/10 flex items-center space-x-3 sm:space-x-4 flex-shrink-0 bg-background z-10"> {/* Increased padding and spacing */}
               {/* Button to open sidebar on small screens */}
               <Button variant="ghost" size="icon" className="md:hidden mr-1 sm:mr-2" onClick={() => setIsSidebarOpen(true)} aria-label="Open conversations list">
                  <MessageSquare className="h-5 w-5" />
               </Button>
               {/* Avatar in Header */}
                <div className="relative flex-shrink-0">
-                   <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-tr from-primary to-secondary flex items-center justify-center text-primary-foreground font-semibold text-sm sm:text-base" aria-hidden="true">
+                   <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-gradient-to-tr from-primary to-secondary flex items-center justify-center text-primary-foreground font-semibold text-sm sm:text-base" aria-hidden="true"> {/* Slightly larger avatar */}
                      {selectedConversation.avatarInitial}
                    </div>
                     {/* Activation Mark in Header */}
                     {selectedConversation.isOnline && (
                          <span
-                             className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-sky-400 ring-2 ring-background"
+                             className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-sky-400 ring-2 ring-background" // Larger indicator
                              aria-label="Online"
                              title="Online"
                           />
@@ -365,7 +363,7 @@ export default function MessagesPage() {
                  <MessageAreaSkeleton />
              ) : (
                 // Use key to force re-render/remount on conversation change, helping with scroll reset
-                <div key={selectedConversationId} ref={chatAreaRef} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 bg-secondary/10">
+                <div key={selectedConversationId} ref={chatAreaRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5 bg-secondary/10"> {/* Increased padding and spacing */}
                   {messages.length === 0 ? (
                     <div className="text-center text-muted-foreground py-10">No messages yet. Start the conversation!</div>
                   ) : (
@@ -377,7 +375,7 @@ export default function MessagesPage() {
                       >
                         <div
                           className={cn(
-                            "max-w-[80%] sm:max-w-[70%] p-2 sm:p-3 rounded-lg shadow-sm break-words", // Reduced shadow
+                            "max-w-[75%] sm:max-w-[65%] p-3 sm:p-4 rounded-lg shadow-sm break-words", // Slightly reduced max-width, increased padding
                             msg.isOwn
                               ? 'bg-primary text-primary-foreground rounded-br-none'
                               : 'bg-card text-card-foreground rounded-bl-none'
@@ -385,7 +383,7 @@ export default function MessagesPage() {
                         >
                           {/* Placeholder: Decrypt message before display */}
                           <p className="text-sm sm:text-base">{msg.text.startsWith('ENC(') ? msg.text.substring(4, msg.text.length - 1) : msg.text}</p>
-                          <p className={`text-xs mt-1 text-right ${msg.isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground' }`}>{msg.timestamp}</p>
+                          <p className={`text-xs mt-1.5 text-right ${msg.isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground' }`}>{msg.timestamp}</p> {/* Increased top margin */}
                         </div>
                       </div>
                     ))
@@ -397,12 +395,12 @@ export default function MessagesPage() {
 
 
             {/* Message Input */}
-            <div className="p-3 sm:p-4 border-t border-primary/10 bg-background flex-shrink-0">
-              <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center space-x-2">
+            <div className="p-4 sm:p-6 border-t border-primary/10 bg-background flex-shrink-0"> {/* Increased padding */}
+              <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center space-x-3"> {/* Increased spacing */}
                  <Input
                    type="text"
                    placeholder="Type your encrypted message..."
-                   className="flex-1 bg-secondary/30 border-primary/20 focus:ring-primary/50 h-10 text-sm sm:text-base"
+                   className="flex-1 bg-secondary/30 border-primary/20 focus:ring-primary/50 h-11 text-sm sm:text-base" // Increased height
                    value={messageInput}
                    onChange={handleInputChange}
                    onKeyDown={handleKeyDown} // Use onKeyDown for Enter key
@@ -412,7 +410,7 @@ export default function MessagesPage() {
                  />
                  <Button
                    type="submit" // Use submit type for form
-                   className="bg-primary hover:bg-primary/90 text-primary-foreground h-10 w-10 flex-shrink-0"
+                   className="bg-primary hover:bg-primary/90 text-primary-foreground h-11 w-11 flex-shrink-0" // Increased height/width
                    size="icon"
                    aria-label="Send message"
                    disabled={!messageInput.trim() || loadingMessages || !selectedConversation}
