@@ -1,4 +1,3 @@
-
 'use client'; // Add 'use client' directive for state and event handlers
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'; // Import hooks
@@ -166,12 +165,15 @@ export default function MessagesPage() {
     // For demo, we add it here but would ideally replace the optimistic message later
     const messageForStorage = {
       ...newMessage,
-      id: Date.now() + Math.random(), // Use a potentially more unique ID for demo storage
+      // Use a more unique ID for demo storage; replace optimistic ID after backend confirmation
+      id: `server-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       text: encryptedText
     };
      if (!allMessages[selectedConversation.id]) {
         allMessages[selectedConversation.id] = [];
      }
+    // In a real app, you'd replace the optimistic message with the server-confirmed one
+    // For demo, just push the "stored" version (conceptually)
     allMessages[selectedConversation.id].push(messageForStorage);
 
 
@@ -186,7 +188,7 @@ export default function MessagesPage() {
     // 1. Use actual encryption library (libsodium, Web Crypto API) here.
     // 2. Call API to send the encrypted message.
     // 3. On API success, update the optimistic message with the real ID and confirmed state:
-    //    setMessages(prev => prev.map(msg => msg.id === optimisticId ? { ...msg, id: realIdFromBackend } : msg));
+    //    setMessages(prev => prev.map(msg => msg.id === optimisticId ? { ...msg, id: messageForStorage.id /* realIdFromBackend */ } : msg));
     // 4. On API error, revert optimistic update or show error state on the message:
     //    setMessages(prev => prev.filter(msg => msg.id !== optimisticId));
     //    toast({ variant: 'destructive', title: 'Failed to send' });
@@ -247,8 +249,9 @@ export default function MessagesPage() {
    );
 
   // Use flex-1 for the container to take available height instead of calc()
+  // Added h-full and overflow-hidden to the outermost div
   return (
-    <div className="flex flex-1 overflow-hidden border border-primary/10 rounded-lg shadow-lg">
+    <div className="flex flex-1 h-full overflow-hidden border border-primary/10 rounded-lg shadow-lg">
       {/* Conversation List Sidebar */}
       <aside
         className={cn(
@@ -312,7 +315,7 @@ export default function MessagesPage() {
          </div>
       </aside>
 
-      {/* Chat Area */}
+      {/* Chat Area - Added overflow-hidden */}
       <main
         className={cn(
           "flex-1 flex flex-col bg-background overflow-hidden transition-opacity duration-300",
@@ -358,43 +361,45 @@ export default function MessagesPage() {
                </div>
             </header>
 
-            {/* Message Area */}
-             {loadingMessages ? (
-                 <MessageAreaSkeleton />
-             ) : (
-                // Use key to force re-render/remount on conversation change, helping with scroll reset
-                <div key={selectedConversationId} ref={chatAreaRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5 bg-secondary/10"> {/* Increased padding and spacing */}
-                  {messages.length === 0 ? (
-                    <div className="text-center text-muted-foreground py-10">No messages yet. Start the conversation!</div>
-                  ) : (
-                    messages.map((msg) => (
-                      <div
-                        // Ensure msg.id is unique, especially with optimistic updates
-                        key={msg.id}
-                        className={`flex ${msg.isOwn ? 'justify-end' : 'justify-start'}`}
-                      >
+            {/* Message Area Wrapper - takes remaining space */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+                {loadingMessages ? (
+                    <MessageAreaSkeleton />
+                ) : (
+                  // Scrollable Message List - takes available space within the wrapper
+                  // Removed key here, it was causing issues with scrolling. Let useEffect handle updates.
+                  <div ref={chatAreaRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5 bg-secondary/10"> {/* Increased padding and spacing */}
+                    {messages.length === 0 ? (
+                      <div className="text-center text-muted-foreground py-10">No messages yet. Start the conversation!</div>
+                    ) : (
+                      messages.map((msg) => (
                         <div
-                          className={cn(
-                            "max-w-[75%] sm:max-w-[65%] p-3 sm:p-4 rounded-lg shadow-sm break-words", // Slightly reduced max-width, increased padding
-                            msg.isOwn
-                              ? 'bg-primary text-primary-foreground rounded-br-none'
-                              : 'bg-card text-card-foreground rounded-bl-none'
-                          )}
+                          // Ensure msg.id is unique, especially with optimistic updates
+                          key={msg.id}
+                          className={`flex ${msg.isOwn ? 'justify-end' : 'justify-start'}`}
                         >
-                          {/* Placeholder: Decrypt message before display */}
-                          <p className="text-sm sm:text-base">{msg.text.startsWith('ENC(') ? msg.text.substring(4, msg.text.length - 1) : msg.text}</p>
-                          <p className={`text-xs mt-1.5 text-right ${msg.isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground' }`}>{msg.timestamp}</p> {/* Increased top margin */}
+                          <div
+                            className={cn(
+                              "max-w-[75%] sm:max-w-[65%] p-3 sm:p-4 rounded-lg shadow-sm break-words", // Slightly reduced max-width, increased padding
+                              msg.isOwn
+                                ? 'bg-primary text-primary-foreground rounded-br-none'
+                                : 'bg-card text-card-foreground rounded-bl-none'
+                            )}
+                          >
+                            {/* Placeholder: Decrypt message before display */}
+                            <p className="text-sm sm:text-base">{msg.text.startsWith('ENC(') ? msg.text.substring(4, msg.text.length - 1) : msg.text}</p>
+                            <p className={`text-xs mt-1.5 text-right ${msg.isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground' }`}>{msg.timestamp}</p> {/* Increased top margin */}
+                          </div>
                         </div>
-                      </div>
-                    ))
-                  )}
-                  {/* Explicit scroll target */}
-                  <div ref={messageEndRef} style={{ height: '1px' }} />
-                </div>
-             )}
+                      ))
+                    )}
+                    {/* Explicit scroll target */}
+                    <div ref={messageEndRef} style={{ height: '1px' }} />
+                  </div>
+                )}
+            </div>
 
-
-            {/* Message Input */}
+            {/* Message Input - Now outside the scrollable wrapper, at the bottom of the main chat area */}
             <div className="p-4 sm:p-6 border-t border-primary/10 bg-background flex-shrink-0"> {/* Increased padding */}
               <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center space-x-3"> {/* Increased spacing */}
                  <Input
