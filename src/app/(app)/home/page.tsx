@@ -263,13 +263,13 @@ export default function HomePage() {
 
               {/* Image Preview */}
               {imagePreview && (
-                  <div className="mb-3 relative group aspect-video max-h-60 w-full"> {/* Added aspect ratio */}
+                  <div className="mb-3 relative group aspect-video w-full overflow-hidden rounded-lg border border-primary/20"> {/* Ensure consistent aspect ratio and overflow handling */}
                       <Image
                           src={imagePreview}
                           alt="Selected image preview"
-                          fill // Use fill and parent aspect ratio
+                          fill // Use fill to cover the container
                           sizes="(max-width: 768px) 100vw, 600px" // Responsive sizes
-                          className="rounded-lg object-cover border border-primary/20"
+                          className="object-cover" // Use object-cover to maintain aspect ratio
                       />
                       <Button
                           type="button"
@@ -359,14 +359,14 @@ export default function HomePage() {
                   {/* Use min-h to prevent collapse if content is short */}
                   <p className="mb-3 sm:mb-4 whitespace-pre-wrap text-sm sm:text-base min-h-[20px]">{post.content}</p>
                   {post.image && (
-                     <div className="relative w-full aspect-video overflow-hidden rounded-lg border border-primary/10"> {/* Aspect ratio */}
+                     <div className="relative w-full aspect-video overflow-hidden rounded-lg border border-primary/10"> {/* Ensure consistent aspect ratio and overflow handling */}
                          <Image
                              src={post.image}
                              alt={`Image for post by ${post.username}`}
-                             fill // Use fill to make image cover the container
+                             fill // Use fill to cover the container
                              sizes="(max-width: 640px) 90vw, (max-width: 768px) 80vw, 600px" // Optimized sizes
-                             style={{ objectFit: 'cover' }} // Ensure image covers the area
-                             className="rounded-lg"
+                             style={{ objectFit: 'cover' }} // Ensure image covers the area, maintaining aspect ratio
+                             className="rounded-lg" // Keep rounded corners
                              priority={index < 3} // Prioritize loading the first few images
                              data-ai-hint={post.imageHint || 'social media image'} // Add AI hint
                              // Handle potential loading errors
