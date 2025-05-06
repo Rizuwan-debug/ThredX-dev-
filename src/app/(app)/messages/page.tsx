@@ -1,3 +1,4 @@
+
 'use client'; // Add 'use client' directive for state and event handlers
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'; // Import hooks
@@ -78,18 +79,17 @@ const allMessages: { [key: number]: Message[] } = {
 // Keep track of the selected conversation ID
 const initialSelectedConversationId = conversations.length > 0 ? conversations[0].id : null; // Select first convo if exists
 
-// Counter for unique optimistic message IDs
-let optimisticIdCounter = 0;
 
 export default function MessagesPage() {
   const { toast } = useToast();
   const [messageInput, setMessageInput] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(initialSelectedConversationId);
   const [messages, setMessages] = useState<Message[]>([]); // Initialize empty
-  const [loadingMessages, setLoadingMessages] = useState<boolean>(false); // Start false
+  const [loadingMessages, setLoadingMessages] = useState<boolean>(true); // Start true for initial load simulation
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const messageEndRef = useRef<HTMLDivElement>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null); // Ref for chat area scrolling
+  const optimisticIdCounter = useRef(0); // Use ref for counter to avoid re-renders
 
   // Derived state for selected conversation details
   const selectedConversation = useMemo(() =>
@@ -145,8 +145,8 @@ export default function MessagesPage() {
     const encryptMessage = (text: string) => `ENC(${text})`; // Simple placeholder
     const encryptedText = encryptMessage(trimmedMessage);
 
-    // Generate a unique optimistic ID
-    const optimisticId = `optimistic-${optimisticIdCounter++}`;
+    // Generate a unique optimistic ID using the ref
+    const optimisticId = `optimistic-${optimisticIdCounter.current++}`;
 
     // Optimistic update
     const newMessage: Message = {
@@ -315,7 +315,7 @@ export default function MessagesPage() {
          </div>
       </aside>
 
-      {/* Chat Area - Added overflow-hidden */}
+      {/* Chat Area - Changed layout to ensure input is always visible */}
       <main
         className={cn(
           "flex-1 flex flex-col bg-background overflow-hidden transition-opacity duration-300",
@@ -361,14 +361,13 @@ export default function MessagesPage() {
                </div>
             </header>
 
-            {/* Message Area Wrapper - takes remaining space */}
-            <div className="flex-1 overflow-hidden flex flex-col">
+            {/* Message Area Wrapper - uses flex-1 to take remaining vertical space */}
+            <div className="flex-1 overflow-hidden flex flex-col h-0"> {/* Set height to 0 to allow flex-1 to work correctly */}
                 {loadingMessages ? (
                     <MessageAreaSkeleton />
                 ) : (
                   // Scrollable Message List - takes available space within the wrapper
-                  // Removed key here, it was causing issues with scrolling. Let useEffect handle updates.
-                  <div ref={chatAreaRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5 bg-secondary/10"> {/* Increased padding and spacing */}
+                  <div ref={chatAreaRef} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 bg-secondary/10">
                     {messages.length === 0 ? (
                       <div className="text-center text-muted-foreground py-10">No messages yet. Start the conversation!</div>
                     ) : (
@@ -399,7 +398,7 @@ export default function MessagesPage() {
                 )}
             </div>
 
-            {/* Message Input - Now outside the scrollable wrapper, at the bottom of the main chat area */}
+            {/* Message Input - Stays at the bottom, doesn't get pushed off screen */}
             <div className="p-4 sm:p-6 border-t border-primary/10 bg-background flex-shrink-0"> {/* Increased padding */}
               <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center space-x-3"> {/* Increased spacing */}
                  <Input
@@ -441,3 +440,4 @@ export default function MessagesPage() {
     </div>
   );
 }
+
