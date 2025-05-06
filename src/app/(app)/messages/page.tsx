@@ -110,6 +110,7 @@ export default function MessagesPage() {
         if (messageEndRef.current) {
              messageEndRef.current.scrollIntoView({ behavior: behavior, block: 'end' });
         } else if (chatAreaRef.current) {
+             // Fallback for general scroll to bottom if ref isn't ready
              chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
         }
     }, 50); // Short delay
@@ -123,12 +124,23 @@ export default function MessagesPage() {
           // Simulate fetching messages with delay
           const timer = setTimeout(() => {
               if (!isMounted) return; // Prevent state update if unmounted
+
+              // Filter out any potential duplicate initial IDs before setting state
               const fetchedMessages = allMessages[selectedConversationId]?.map(msg => ({
                   ...msg,
-                  // Ensure unique IDs for initial load as well
+                  // Ensure unique IDs for initial load as well, adding prefix
                   id: typeof msg.id === 'number' ? `initial-${msg.id}` : msg.id
               })) || [];
-              setMessages(fetchedMessages);
+
+              // Further check within fetchedMessages for uniqueness before setting
+              const uniqueFetchedMessages = fetchedMessages.reduce((acc: Message[], current) => {
+                  if (!acc.some(item => item.id === current.id)) {
+                      acc.push(current);
+                  }
+                  return acc;
+              }, []);
+
+              setMessages(uniqueFetchedMessages);
               setLoadingMessages(false);
               scrollToBottom('auto'); // Scroll quickly on load
           }, 300); // Simulate network delay
@@ -141,7 +153,7 @@ export default function MessagesPage() {
           setMessages([]); // Clear if no conversation is selected
           setLoadingMessages(false);
       }
-  }, [selectedConversationId, scrollToBottom, generateUniqueId]);
+  }, [selectedConversationId, scrollToBottom, generateUniqueId]); // Add generateUniqueId dependency
 
   // Effect to measure and handle scrolling behavior
   useEffect(() => {
@@ -180,8 +192,15 @@ export default function MessagesPage() {
         isOwn: true,
     };
 
-    // Add the new message to the current state
-    setMessages(prevMessages => [...prevMessages, newMessage]);
+    // Add the new message to the current state, ensuring no key collision
+     setMessages(prevMessages => {
+        // Double check if ID exists before adding
+        if (prevMessages.some(msg => msg.id === optimisticId)) {
+            console.warn("Optimistic ID collision detected, regenerating ID for new message.");
+            newMessage.id = generateUniqueId(); // Regenerate if collision (highly unlikely but safe)
+        }
+        return [...prevMessages, newMessage];
+    });
 
     // Simulate adding to mock data store (with encrypted text)
     const messageForStorage = {
@@ -212,7 +231,7 @@ export default function MessagesPage() {
     //    setMessages(prev => prev.filter(msg => msg.id !== optimisticId));
     //    toast({ variant: 'destructive', title: 'Failed to send' });
 
-  }, [messageInput, selectedConversation, loadingMessages, toast, scrollToBottom, generateUniqueId]);
+  }, [messageInput, selectedConversation, loadingMessages, toast, scrollToBottom, generateUniqueId]); // Added toast to dependencies
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setMessageInput(event.target.value);
@@ -276,6 +295,8 @@ export default function MessagesPage() {
 
   // Use flex-1 for the container to take available height instead of calc()
   // Added h-full and overflow-hidden to the outermost div
+  // Ensure the outermost div fills the viewport height (flex-1 and h-full)
+  // Use flex and flex-col on the main content area (`<main>`)
   return (
     <div className="flex flex-1 h-full overflow-hidden border border-primary/10 rounded-lg shadow-lg">
       {/* Conversation List Sidebar */}
@@ -342,6 +363,7 @@ export default function MessagesPage() {
       </aside>
 
       {/* Chat Area */}
+      {/* Make the main chat area flex column and ensure it takes remaining space */}
       <main
         className={cn(
           "flex-1 flex flex-col bg-background overflow-hidden transition-opacity duration-300",
@@ -353,7 +375,7 @@ export default function MessagesPage() {
       >
         {selectedConversation ? (
           <>
-            {/* Chat Header */}
+            {/* Chat Header - remains as flex-shrink-0 */}
             <header className="p-4 sm:p-6 border-b border-primary/10 flex items-center space-x-3 sm:space-x-4 flex-shrink-0 bg-background z-10"> {/* Increased padding and spacing */}
               {/* Button to open sidebar on small screens */}
               <Button variant="ghost" size="icon" className="md:hidden mr-1 sm:mr-2" onClick={() => setIsSidebarOpen(true)} aria-label="Open conversations list">
@@ -387,13 +409,14 @@ export default function MessagesPage() {
                 </div>
             </header>
 
-            {/* Message Area Wrapper - uses flex-1 to take remaining vertical space */}
-            <div className="flex-1 overflow-hidden flex flex-col h-0"> {/* Set height to 0 to allow flex-1 to work correctly */}
+            {/* Message Area Wrapper - This div will grow and contain the scrolling */}
+             {/* Corrected: Added overflow-y-auto and removed h-0 */}
+             <div className="flex-1 overflow-y-auto flex flex-col">
                 {loadingMessages ? (
                     <MessageAreaSkeleton />
                 ) : (
-                  // Scrollable Message List - takes available space within the wrapper
-                   <div ref={chatAreaRef} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 bg-secondary/10">
+                  // Scrollable Message List - Use mt-auto to push content up
+                   <div ref={chatAreaRef} className="flex-1 p-3 sm:p-4 space-y-3 sm:space-y-4 bg-secondary/10 mt-auto">
                      {messages.length === 0 ? (
                        <div className="text-center text-muted-foreground py-10">No messages yet. Start the conversation!</div>
                      ) : (
@@ -423,7 +446,8 @@ export default function MessagesPage() {
                 )}
             </div>
 
-            {/* Message Input - Stays at the bottom */}
+
+            {/* Message Input - remains as flex-shrink-0 */}
              <div className="p-4 sm:p-6 border-t border-primary/10 bg-background flex-shrink-0">
                <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center space-x-3">
                   {/* Emoji Picker Popover */}
@@ -492,76 +516,3 @@ export default function MessagesPage() {
     </div>
   );
 }
-
-```content>
-  </change>
-  <change>
-    <file>src/app/layout.tsx</file>
-    <description>Wrap RootLayout children with ThemeProvider from next-themes.</description>
-    <content><![CDATA[
-import type { Metadata, Viewport } from "next"; // Import Viewport
-import { Inter } from "next/font/google";
-import "./globals.css";
-import { cn } from "@/lib/utils";
-import { Toaster } from "@/components/ui/toaster";
-import { NavigationEvents } from "@/components/navigation-events";
-import { Suspense } from "react";
-import { ThemeProvider } from "next-themes"; // Import ThemeProvider
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-sans",
-});
-
-export const metadata: Metadata = {
-  title: "ThredX",
-  description: "Your Privacy, Our Priority. Secure, decentralized communication.", // Enhanced description
-  manifest: "/manifest.json", // Example for PWA
-  icons: { // Example for better icons
-    icon: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
-  },
-};
-
-// Add viewport settings for responsiveness
-export const viewport: Viewport = {
-  themeColor: '#0A0E1A', // Match dark background - updated to Dark Navy Blue
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 1, // Prevent zooming to maintain layout control
-  userScalable: false, // Consider if zooming is truly needed
-}
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    // Note: Removed dark class and suppressHydrationWarning from html tag
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={cn(
-          "min-h-screen bg-background font-sans antialiased",
-          inter.variable
-        )}
-      >
-        {/* Wrap children with ThemeProvider */}
-        <ThemeProvider
-            attribute="class"
-            defaultTheme="dark" // Set dark theme as default
-            enableSystem={false} // Disable system theme preference if you want to force dark
-            disableTransitionOnChange
-         >
-          {/* Suspense is crucial for NavigationEvents as it's a Client Component */}
-          <Suspense fallback={null}>
-            <NavigationEvents />
-          </Suspense>
-          {children}
-          <Toaster />
-        </ThemeProvider>
-      </body>
-    </html>
-  );
-}
-
