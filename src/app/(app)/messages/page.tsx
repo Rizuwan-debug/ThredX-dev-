@@ -5,10 +5,13 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Send, PanelLeftOpen, MessageSquare, Loader2, User, Users } from 'lucide-react'; // Added User, Users
+import { Send, PanelLeftOpen, MessageSquare, Loader2, User, Users, Smile } from 'lucide-react'; // Added Smile icon
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'; // Import Popover components
+import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react'; // Import EmojiPicker
 import { useToast } from '@/hooks/use-toast'; // Import useToast
 import { cn } from '@/lib/utils'; // Import cn for conditional classes
 import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton for loading state
+import { useTheme } from 'next-themes'; // Import useTheme to get current theme
 
 // --- Mock Data Structure ---
 interface Message {
@@ -79,7 +82,6 @@ const allMessages: { [key: number]: Message[] } = {
 // Keep track of the selected conversation ID
 const initialSelectedConversationId = conversations.length > 0 ? conversations[0].id : null; // Select first convo if exists
 
-
 export default function MessagesPage() {
   const { toast } = useToast();
   const [messageInput, setMessageInput] = useState('');
@@ -89,9 +91,11 @@ export default function MessagesPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const messageEndRef = useRef<HTMLDivElement>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null); // Ref for chat area scrolling
-  const optimisticIdCounter = useRef(0); // Use ref for counter to avoid re-renders
-  const [contentHeight, setContentHeight] = useState(0); // Track content height
-  const [containerHeight, setContainerHeight] = useState(0); // Track container height
+  const inputRef = useRef<HTMLInputElement>(null); // Ref for the message input
+  const { resolvedTheme } = useTheme(); // Get resolved theme ('dark' or 'light')
+
+  // Ensure unique IDs for messages, especially optimistic ones
+  const generateUniqueId = useCallback(() => `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`, []);
 
   // Derived state for selected conversation details
   const selectedConversation = useMemo(() =>
@@ -116,13 +120,14 @@ export default function MessagesPage() {
       let isMounted = true;
       if (selectedConversationId) {
           setLoadingMessages(true);
-          // Avoid clearing messages immediately to prevent flash
-          // setMessages([]);
-
           // Simulate fetching messages with delay
           const timer = setTimeout(() => {
               if (!isMounted) return; // Prevent state update if unmounted
-              const fetchedMessages = allMessages[selectedConversationId] || [];
+              const fetchedMessages = allMessages[selectedConversationId]?.map(msg => ({
+                  ...msg,
+                  // Ensure unique IDs for initial load as well
+                  id: typeof msg.id === 'number' ? `initial-${msg.id}` : msg.id
+              })) || [];
               setMessages(fetchedMessages);
               setLoadingMessages(false);
               scrollToBottom('auto'); // Scroll quickly on load
@@ -136,31 +141,23 @@ export default function MessagesPage() {
           setMessages([]); // Clear if no conversation is selected
           setLoadingMessages(false);
       }
-  }, [selectedConversationId, scrollToBottom]); // Dependency on ID and scroll function
+  }, [selectedConversationId, scrollToBottom, generateUniqueId]);
 
-    // Effect to measure content and container heights
-    useEffect(() => {
-        const measureHeights = () => {
-            if (chatAreaRef.current) {
-                setContentHeight(chatAreaRef.current.scrollHeight);
-                setContainerHeight(chatAreaRef.current.clientHeight);
-            }
-        };
+  // Effect to measure and handle scrolling behavior
+  useEffect(() => {
+      const chatArea = chatAreaRef.current;
+      if (!chatArea) return;
 
-        // Initial measurement
-        measureHeights();
+      const handleScroll = () => {
+          // Example: Load older messages on scroll to top (not implemented)
+          // if (chatArea.scrollTop === 0 && !loadingMessages) {
+          //     console.log("Scrolled to top - load older messages?");
+          // }
+      };
 
-        // Observe changes to the chat area (e.g., new messages)
-        const observer = new ResizeObserver(measureHeights);
-        if (chatAreaRef.current) {
-            observer.observe(chatAreaRef.current);
-        }
-
-        return () => {
-            observer.disconnect();
-        };
-    }, [messages]); // Re-measure when messages change
-
+      chatArea.addEventListener('scroll', handleScroll);
+      return () => chatArea.removeEventListener('scroll', handleScroll);
+  }, [loadingMessages]);
 
   const handleSendMessage = useCallback(() => {
     const trimmedMessage = messageInput.trim();
@@ -170,8 +167,8 @@ export default function MessagesPage() {
     const encryptMessage = (text: string) => `ENC(${text})`; // Simple placeholder
     const encryptedText = encryptMessage(trimmedMessage);
 
-    // Generate a unique optimistic ID using the ref
-    const optimisticId = `optimistic-${optimisticIdCounter.current++}`;
+    // Generate a unique optimistic ID
+    const optimisticId = generateUniqueId();
 
     // Optimistic update
      const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -187,19 +184,15 @@ export default function MessagesPage() {
     setMessages(prevMessages => [...prevMessages, newMessage]);
 
     // Simulate adding to mock data store (with encrypted text)
-    // This should happen *after* a successful backend call in a real app
-    // For demo, we add it here but would ideally replace the optimistic message later
     const messageForStorage = {
       ...newMessage,
-      // Use a more unique ID for demo storage; replace optimistic ID after backend confirmation
-      id: `server-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      // Use a new unique ID for demo storage; replace optimistic ID after backend confirmation
+      id: generateUniqueId(),
       text: encryptedText
     };
      if (!allMessages[selectedConversation.id]) {
         allMessages[selectedConversation.id] = [];
      }
-    // In a real app, you'd replace the optimistic message with the server-confirmed one
-    // For demo, just push the "stored" version (conceptually)
     allMessages[selectedConversation.id].push(messageForStorage);
 
 
@@ -219,7 +212,7 @@ export default function MessagesPage() {
     //    setMessages(prev => prev.filter(msg => msg.id !== optimisticId));
     //    toast({ variant: 'destructive', title: 'Failed to send' });
 
-  }, [messageInput, selectedConversation, loadingMessages, toast, scrollToBottom]);
+  }, [messageInput, selectedConversation, loadingMessages, toast, scrollToBottom, generateUniqueId]);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setMessageInput(event.target.value);
@@ -246,6 +239,14 @@ export default function MessagesPage() {
       }
   }, [selectedConversationId]);
 
+  // Handle Emoji Click
+  const onEmojiClick = (emojiData: EmojiClickData) => {
+    setMessageInput(prevInput => prevInput + emojiData.emoji);
+    // Optionally close the picker or focus the input
+    // popoverOpenRef.current = false; // If managing Popover state manually
+    inputRef.current?.focus();
+  };
+
   // Skeleton loader for conversations list
   const ConversationListSkeleton = () => (
     <div className="p-3 sm:p-4 space-y-3">
@@ -263,7 +264,6 @@ export default function MessagesPage() {
 
    // Skeleton loader for messages area
    const MessageAreaSkeleton = () => (
-    // Added more padding and spacing
     <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-secondary/10 flex flex-col justify-end">
         {/* Simulate messages loading from bottom up */}
         <div className="flex justify-start mt-auto"> <Skeleton className="h-8 w-1/3 rounded-lg" /> </div>
@@ -317,7 +317,7 @@ export default function MessagesPage() {
                      {/* Activation Mark (Online Status) */}
                      {convo.isOnline && (
                          <span
-                             className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-sky-400 ring-2 ring-background" // Larger indicator
+                             className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-sky-400 ring-2 ring-background" // Use sky-400 for light blue
                              aria-label="Online"
                              title="Online"
                           />
@@ -341,7 +341,7 @@ export default function MessagesPage() {
          </div>
       </aside>
 
-      {/* Chat Area - Changed layout to ensure input is always visible */}
+      {/* Chat Area */}
       <main
         className={cn(
           "flex-1 flex flex-col bg-background overflow-hidden transition-opacity duration-300",
@@ -367,7 +367,7 @@ export default function MessagesPage() {
                     {/* Activation Mark in Header */}
                     {selectedConversation.isOnline && (
                          <span
-                             className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-sky-400 ring-2 ring-background" // Larger indicator
+                             className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-sky-400 ring-2 ring-background" // Use sky-400 for light blue
                              aria-label="Online"
                              title="Online"
                           />
@@ -393,65 +393,88 @@ export default function MessagesPage() {
                     <MessageAreaSkeleton />
                 ) : (
                   // Scrollable Message List - takes available space within the wrapper
-                  <div ref={chatAreaRef} className={cn(
-                    "flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 bg-secondary/10",
-                    contentHeight < containerHeight ? "mt-0" : "mt-auto"  // Prevent top margin if content is shorter
-                  )}>
-                    {messages.length === 0 ? (
-                      <div className="text-center text-muted-foreground py-10">No messages yet. Start the conversation!</div>
-                    ) : (
-                      messages.map((msg) => (
-                        <div
-                          // Ensure msg.id is unique, especially with optimistic updates
-                          key={msg.id}
-                          className={`flex ${msg.isOwn ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div
-                            className={cn(
-                              "max-w-[75%] sm:max-w-[65%] p-3 sm:p-4 rounded-lg shadow-sm break-words", // Slightly reduced max-width, increased padding
-                              msg.isOwn
-                                ? 'bg-primary text-primary-foreground rounded-br-none'
-                                : 'bg-card text-card-foreground rounded-bl-none'
-                            )}
-                          >
-                            {/* Placeholder: Decrypt message before display */}
-                            <p className="text-sm sm:text-base">{msg.text.startsWith('ENC(') ? msg.text.substring(4, msg.text.length - 1) : msg.text}</p>
-                            <p className={`text-xs mt-1.5 text-right ${msg.isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground' }`}>{msg.timestamp}</p> {/* Increased top margin */}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                    {/* Explicit scroll target */}
-                    <div ref={messageEndRef} style={{ height: '1px' }} />
-                  </div>
+                   <div ref={chatAreaRef} className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 bg-secondary/10">
+                     {messages.length === 0 ? (
+                       <div className="text-center text-muted-foreground py-10">No messages yet. Start the conversation!</div>
+                     ) : (
+                       messages.map((msg) => (
+                         <div
+                           key={msg.id} // Use unique ID
+                           className={`flex ${msg.isOwn ? 'justify-end' : 'justify-start'}`}
+                         >
+                           <div
+                             className={cn(
+                               "max-w-[75%] sm:max-w-[65%] p-3 sm:p-4 rounded-lg shadow-sm break-words",
+                               msg.isOwn
+                                 ? 'bg-primary text-primary-foreground rounded-br-none'
+                                 : 'bg-card text-card-foreground rounded-bl-none'
+                             )}
+                           >
+                             {/* Placeholder: Decrypt message before display */}
+                             <p className="text-sm sm:text-base">{msg.text.startsWith('ENC(') ? msg.text.substring(4, msg.text.length - 1) : msg.text}</p>
+                             <p className={`text-xs mt-1.5 text-right ${msg.isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground' }`}>{msg.timestamp}</p>
+                           </div>
+                         </div>
+                       ))
+                     )}
+                     {/* Explicit scroll target */}
+                     <div ref={messageEndRef} style={{ height: '1px' }} />
+                   </div>
                 )}
             </div>
 
-            {/* Message Input - Stays at the bottom, doesn't get pushed off screen */}
-            <div className="p-4 sm:p-6 border-t border-primary/10 bg-background flex-shrink-0"> {/* Increased padding */}
-              <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center space-x-3"> {/* Increased spacing */}
-                 <Input
-                   type="text"
-                   placeholder="Type your encrypted message..."
-                   className="flex-1 bg-secondary/30 border-primary/20 focus:ring-primary/50 h-11 text-sm sm:text-base" // Increased height
-                   value={messageInput}
-                   onChange={handleInputChange}
-                   onKeyDown={handleKeyDown} // Use onKeyDown for Enter key
-                   disabled={loadingMessages || !selectedConversation}
-                   aria-label="Message input"
-                   autoComplete="off"
-                 />
-                 <Button
-                   type="submit" // Use submit type for form
-                   className="bg-primary hover:bg-primary/90 text-primary-foreground h-11 w-11 flex-shrink-0" // Increased height/width
-                   size="icon"
-                   aria-label="Send message"
-                   disabled={!messageInput.trim() || loadingMessages || !selectedConversation}
-                 >
-                   {loadingMessages ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                 </Button>
-              </form>
-            </div>
+            {/* Message Input - Stays at the bottom */}
+             <div className="p-4 sm:p-6 border-t border-primary/10 bg-background flex-shrink-0">
+               <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center space-x-3">
+                  {/* Emoji Picker Popover */}
+                  <Popover>
+                     <PopoverTrigger asChild>
+                       <Button
+                         variant="ghost"
+                         size="icon"
+                         className="text-muted-foreground hover:text-foreground h-11 w-11 flex-shrink-0"
+                         aria-label="Open emoji picker"
+                         disabled={loadingMessages || !selectedConversation}
+                       >
+                         <Smile className="h-5 w-5" />
+                       </Button>
+                     </PopoverTrigger>
+                     <PopoverContent className="w-auto p-0 border-0 bg-transparent shadow-none mb-2">
+                         <EmojiPicker
+                           onEmojiClick={onEmojiClick}
+                           theme={resolvedTheme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                           lazyLoadEmojis={true}
+                           searchDisabled // Optionally disable search
+                           // skinTonesDisabled // Optionally disable skin tones
+                           height={350}
+                           width="100%"
+                         />
+                     </PopoverContent>
+                   </Popover>
+
+                  <Input
+                    ref={inputRef} // Add ref
+                    type="text"
+                    placeholder="Type your encrypted message..."
+                    className="flex-1 bg-secondary/30 border-primary/20 focus:ring-primary/50 h-11 text-sm sm:text-base"
+                    value={messageInput}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
+                    disabled={loadingMessages || !selectedConversation}
+                    aria-label="Message input"
+                    autoComplete="off"
+                  />
+                  <Button
+                    type="submit"
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground h-11 w-11 flex-shrink-0"
+                    size="icon"
+                    aria-label="Send message"
+                    disabled={!messageInput.trim() || loadingMessages || !selectedConversation}
+                  >
+                    {loadingMessages ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                  </Button>
+               </form>
+             </div>
           </>
         ) : (
            // State when no conversation is selected
@@ -467,6 +490,78 @@ export default function MessagesPage() {
         )}
       </main>
     </div>
+  );
+}
+
+```content>
+  </change>
+  <change>
+    <file>src/app/layout.tsx</file>
+    <description>Wrap RootLayout children with ThemeProvider from next-themes.</description>
+    <content><![CDATA[
+import type { Metadata, Viewport } from "next"; // Import Viewport
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { cn } from "@/lib/utils";
+import { Toaster } from "@/components/ui/toaster";
+import { NavigationEvents } from "@/components/navigation-events";
+import { Suspense } from "react";
+import { ThemeProvider } from "next-themes"; // Import ThemeProvider
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
+
+export const metadata: Metadata = {
+  title: "ThredX",
+  description: "Your Privacy, Our Priority. Secure, decentralized communication.", // Enhanced description
+  manifest: "/manifest.json", // Example for PWA
+  icons: { // Example for better icons
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
+};
+
+// Add viewport settings for responsiveness
+export const viewport: Viewport = {
+  themeColor: '#0A0E1A', // Match dark background - updated to Dark Navy Blue
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1, // Prevent zooming to maintain layout control
+  userScalable: false, // Consider if zooming is truly needed
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    // Note: Removed dark class and suppressHydrationWarning from html tag
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={cn(
+          "min-h-screen bg-background font-sans antialiased",
+          inter.variable
+        )}
+      >
+        {/* Wrap children with ThemeProvider */}
+        <ThemeProvider
+            attribute="class"
+            defaultTheme="dark" // Set dark theme as default
+            enableSystem={false} // Disable system theme preference if you want to force dark
+            disableTransitionOnChange
+         >
+          {/* Suspense is crucial for NavigationEvents as it's a Client Component */}
+          <Suspense fallback={null}>
+            <NavigationEvents />
+          </Suspense>
+          {children}
+          <Toaster />
+        </ThemeProvider>
+      </body>
+    </html>
   );
 }
 
